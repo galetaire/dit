@@ -1,0 +1,14 @@
+{
+  "name": "dit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Handshake resolver for your home network, on Umbrel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

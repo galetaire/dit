@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dit</title>
+  <link rel="icon" href="icon.png" type="image/png">
+  <link rel="preload" href="fonts/ibm-plex-sans-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#top">
+      <img src="icon.png" alt="" width="40" height="40">
+      <span><strong>Dit</strong><small>Handshake resolver for your network</small></span>
+    </a>
+    <span class="pill" id="overall" data-state="wait">Starting…</span>
+  </header>
+
+  <main id="top">
+    <section class="grid" aria-label="Status">
+      <article class="card">
+        <h2>Handshake sync</h2>
+        <p class="big" id="sync-headline">…</p>
+        <div class="bar" role="progressbar" aria-label="Sync progress" aria-valuemin="0" aria-valuemax="100" id="sync-bar"><span id="sync-fill"></span></div>
+        <dl class="facts">
+          <div><dt>Block height</dt><dd id="sync-height">–</dd></div>
+          <div><dt>Peers</dt><dd id="sync-peers">–</dd></div>
+          <div><dt>Latest block</dt><dd id="sync-tip">–</dd></div>
+        </dl>
+        <p class="note" id="sync-note"></p>
+      </article>
+
+      <article class="card">
+        <h2>DNS on your network</h2>
+        <p class="big" id="dns-headline">…</p>
+        <dl class="facts">
+          <div><dt>Mode</dt><dd id="dns-mode">–</dd></div>
+          <div><dt>Listening on</dt><dd id="dns-ports">–</dd></div>
+          <div><dt>Umbrel address</dt><dd id="dns-addresses">–</dd></div>
+        </dl>
+        <p class="note warn" id="dns-error" hidden></p>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Test a name</h2>
+      <p class="lead">Looks the name up through Dit's resolver, the same way your devices will.</p>
+      <form id="lookup-form" class="row">
+        <label class="grow">
+          <span class="label">Name</span>
+          <input id="lookup-name" type="text" placeholder="for example: mysite or wikipedia.org" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        </label>
+        <label>
+          <span class="label">Record</span>
+          <select id="lookup-type">
+            <option>A</option><option>AAAA</option><option>TLSA</option><option>TXT</option><option>NS</option><option>CNAME</option><option>MX</option><option>DS</option>
+          </select>
+        </label>
+        <button type="submit" id="lookup-button">Look up</button>
+      </form>
+      <div id="lookup-result" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <h2>How Dit listens</h2>
+      <p class="lead">Only one app on your Umbrel can use the standard DNS port (53). Pi-hole and AdGuard Home use it too.</p>
+      <form id="mode-form">
+        <label class="choice">
+          <input type="radio" name="mode" value="auto">
+          <span><strong>Automatic</strong><small>Use port 53 if no other app has it; otherwise act as an upstream. Decided once and remembered.</small></span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="mode" value="standalone">
+          <span><strong>DNS server for my network</strong><small>Listens on port 53 (and <span class="alt-port">5300</span>). Choose this when Dit is the only DNS app on your Umbrel.</small></span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="mode" value="upstream">
+          <span><strong>Upstream for Pi-hole or AdGuard Home</strong><small>Listens only on port <span class="alt-port">5300</span> and leaves port 53 to the other app.</small></span>
+        </label>
+        <div class="row">
+          <button type="submit" id="mode-button">Save</button>
+          <span class="note" id="mode-saved" aria-live="polite"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Set up your devices</h2>
+      <p class="lead">Pick the setup that matches your network. Addresses below are filled in from your Umbrel.</p>
+
+      <details open>
+        <summary>Whole home network (router)</summary>
+        <ol>
+          <li>Give your Umbrel a fixed address in your router (often called "DHCP reservation" or "static lease"), so it does not change.</li>
+          <li>In the router's DHCP or LAN settings, set the DNS server to <code class="lan-ip">your Umbrel's IP</code>. Leave the secondary DNS empty: a second server would answer some lookups without Handshake.</li>
+          <li>Reconnect your devices to Wi-Fi so they pick up the new setting.</li>
+        </ol>
+        <p class="note">Needs the "DNS server for my network" mode. If your Umbrel is off, devices lose DNS until it is back or you undo the router setting.</p>
+      </details>
+
+      <details>
+        <summary>Android phone</summary>
+        <ol>
+          <li><strong>At home:</strong> follow the router setup above, or set it for one Wi-Fi network: Settings → Network &amp; internet → Internet → your network → edit → Advanced → IP settings: Static, and enter <code class="lan-ip">your Umbrel's IP</code> as DNS 1.</li>
+          <li>Settings → Network &amp; internet → <strong>Private DNS</strong> must be <strong>Off</strong> or <strong>Automatic</strong>. A provider name there (for example dns.google) bypasses Dit.</li>
+          <li>In Chrome: Settings → Privacy and security → Use secure DNS → <strong>Use your current service provider</strong>, or turn it off.</li>
+          <li><strong>Away from home:</strong> use the Tailscale setup below. Android has no DNS setting for mobile data.</li>
+        </ol>
+        <p class="note">Handshake names open in the browser by typing them with a trailing slash, for example <code>mysite/</code>, so the browser does not search for them instead.</p>
+      </details>
+
+      <details>
+        <summary>Anywhere, with Tailscale</summary>
+        <ol>
+          <li>Install the Tailscale app on your Umbrel and on your phone or laptop, and sign in to the same account.</li>
+          <li>In the Tailscale admin console, open DNS → Nameservers → Add nameserver → Custom, and enter <code class="ts-ip">your Umbrel's Tailscale IP (100.x.y.z)</code>.</li>
+          <li>Turn on <strong>Override DNS servers</strong>.</li>
+          <li>With Tailscale connected, the device resolves Handshake names through your Umbrel on any network, without opening ports on your router.</li>
+        </ol>
+        <p class="note">Needs the "DNS server for my network" mode: Tailscale nameservers always use port 53.</p>
+      </details>
+
+      <details>
+        <summary>Behind Pi-hole</summary>
+        <ol>
+          <li>Choose "Upstream for Pi-hole or AdGuard Home" above and save.</li>
+          <li>In Pi-hole: Settings → DNS → untick the listed upstream servers, and add the custom server <code>127.0.0.1#<span class="alt-port">5300</span></code>.</li>
+          <li>Leave "Use DNSSEC" off in Pi-hole: it checks answers against the regular internet's root key and may reject Handshake names. Dit already validates them.</li>
+          <li>Save. Pi-hole keeps blocking ads and sends every lookup to Dit.</li>
+        </ol>
+      </details>
+
+      <details>
+        <summary>Behind AdGuard Home</summary>
+        <ol>
+          <li>Choose "Upstream for Pi-hole or AdGuard Home" above and save.</li>
+          <li>In AdGuard Home: Settings → DNS settings → Upstream DNS servers, replace the list with <code>127.0.0.1:<span class="alt-port">5300</span></code>.</li>
+          <li>Apply. AdGuard Home keeps filtering and sends every lookup to Dit.</li>
+        </ol>
+      </details>
+
+      <p class="note warn">Never forward port 53 from your router to your Umbrel. A resolver open to the internet gets abused for attacks on others.</p>
+    </section>
+
+    <section class="card">
+      <details id="log-details">
+        <summary>hnsd log</summary>
+        <pre id="log" tabindex="0">Open to load…</pre>
+      </details>
+    </section>
+  </main>
+
+  <footer><span id="version"></span> · hnsd light client + dnsproxy · names are verified against Handshake block headers on your own Umbrel</footer>
+  <script src="app.js"></script>
+</body>
+</html>

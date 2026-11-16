@@ -1,0 +1,44 @@
+manifestVersion: 1
+id: dit-resolver
+name: Dit
+tagline: Resolve Handshake names on your whole home network
+icon: https://raw.githubusercontent.com/galetaire/dit/main/dit-resolver/dit.png
+category: networking
+version: "0.1.0"
+port: 4748
+description: >-
+  Dit is a DNS resolver for Handshake (HNS) names that runs on your own
+  Umbrel. Point your router, your phone or a single device at it and every
+  Handshake name resolves, next to all the regular internet names, with no
+  app to install on each device and no public resolver to trust.
+
+
+  It runs hnsd, the Handshake light client: it syncs block headers in a
+  couple of minutes, needs very little disk space and verifies every
+  Handshake answer against the blockchain. No full node is required.
+
+
+  Use it as the DNS server of your network, reach it from anywhere through
+  Tailscale, or keep Pi-hole or AdGuard Home in charge and add Dit as
+  their upstream resolver. A built-in page shows the sync status, tests any
+  name and walks you through each setup.
+
+
+  This version resolves names. Sites secured only with DANE still show a
+  certificate warning in the browser: validating DANE for your devices is
+  planned for the next version.
+developer: galetaire
+website: https://github.com/galetaire/dit
+submitter: galetaire
+submission: https://github.com/galetaire/dit
+repo: https://github.com/galetaire/dit
+support: https://github.com/galetaire/dit/issues
+gallery: []
+releaseNotes: >-
+  First version: Handshake resolver (hnsd) for your network, with a status
+  page, a name tester and setup guides for routers, Android, Tailscale,
+  Pi-hole and AdGuard Home.
+dependencies: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""

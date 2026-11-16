@@ -1,0 +1,2 @@
+id: "dit" # Prefix for every app in this store (a-z and dashes only).
+name: "Dit" # Shows up in umbrelOS as "Dit App Store".

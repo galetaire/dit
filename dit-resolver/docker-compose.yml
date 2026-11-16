@@ -1,0 +1,53 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      # The format here is: <app-id>_<docker-service-name>_1
+      APP_HOST: dit-resolver_server_1
+      APP_PORT: 3000
+
+  # Web UI + hnsd (the Handshake light client and its recursive resolver).
+  # They share a container because hnsd only answers status queries from localhost.
+  server:
+    image: ghcr.io/galetaire/dit:0.1.0
+    restart: on-failure
+    stop_grace_period: 30s
+    environment:
+      - TZ=Etc/UTC
+      # Only accept connections routed by Umbrel (see docker/web/lib/source.js).
+      # Older umbrelOS versions route through this app_proxy container.
+      - DIT_PROXY_HOST=dit-resolver_app_proxy_1
+    ports:
+      # hnsd's resolver, published on the Umbrel's loopback only: the "dns"
+      # service below is the one that faces your network.
+      - "127.0.0.1:15350:5350/udp"
+    volumes:
+      # hnsd's saved headers, settings.json and the dns service's state file
+      - ${APP_DATA_DIR}/data:/data
+
+  # DNS front end (dnsproxy): listens on the Umbrel's own network interfaces,
+  # caches, adds TCP, and forwards everything to hnsd.
+  # Host networking lets it choose its ports at runtime: 53 when Dit is the
+  # network's DNS server, or only 5300 when Pi-hole/AdGuard Home (which also use
+  # host networking and port 53 on Umbrel) are in front of it.
+  dns:
+    image: ghcr.io/galetaire/dit:0.1.0
+    restart: on-failure
+    network_mode: host
+    # Root with just enough to bind port 53 and write its state file
+    user: "0:0"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - DAC_OVERRIDE
+    entrypoint: ["/sbin/tini", "--"]
+    command: ["node", "/opt/dit/dns-runner.js"]
+    environment:
+      - TZ=Etc/UTC
+      - DIT_UPSTREAM=127.0.0.1:15350
+      # The port Dit always listens on, for Pi-hole/AdGuard Home upstreams
+      - DIT_ALT_PORT=5300
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
