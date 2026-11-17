@@ -24,6 +24,19 @@ RUN apk add --no-cache curl \
     | tar xz -C /tmp \
  && mv "/tmp/linux-${TARGETARCH}/dnsproxy" /dnsproxy
 
+# ---- dit-dane: the DANE proxy (Go, built on letsdane, Apache-2.0) ----
+FROM golang:1.26-alpine AS dane
+WORKDIR /src
+COPY dane/go.mod dane/go.sum ./
+RUN go mod download
+COPY dane/ ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /dit-dane .
+# IANA's list of ICANN top-level domains, fresh at every build: these names go
+# direct (not through the proxy) and the local CA can never sign them.
+# The count check stops a truncated download from weakening the CA.
+RUN wget -qO /icann-tlds.txt https://data.iana.org/TLD/tlds-alpha-by-domain.txt \
+ && test "$(grep -vc '^#' /icann-tlds.txt)" -gt 1000
+
 # ---- Dit ----
 FROM node:22-alpine
 
@@ -32,9 +45,11 @@ RUN apk add --no-cache unbound-libs su-exec tini
 
 COPY --from=hnsd /hnsd/hnsd /usr/local/bin/hnsd
 COPY --from=dnsproxy /dnsproxy /usr/local/bin/dnsproxy
+COPY --from=dane /dit-dane /usr/local/bin/dit-dane
 
 # Dit has no npm dependencies, only Node's standard library
 COPY web /opt/dit
+COPY --from=dane /icann-tlds.txt /opt/dit/icann-tlds.txt
 RUN chmod 755 /opt/dit/entrypoint.sh
 
 ENV NODE_ENV=production \

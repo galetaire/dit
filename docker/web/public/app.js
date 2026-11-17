@@ -128,6 +128,29 @@ function renderDns(dns, settings) {
   }
 }
 
+// The DANE proxy, on the Secure sites page. Its address is the Umbrel's LAN address.
+function renderDane(dane, dns) {
+  const lan = dns ? dns.addresses.filter(a => !a.tailscale).map(a => a.address) : [];
+  const host = lan[0] || location.hostname;
+  if (!dane) {
+    setPill('dane-pill', 'fail', 'Not running');
+    $('dane-headline').textContent = 'The DANE proxy is not running';
+    $('dane-port').textContent = '–';
+    $('dane-until').textContent = '–';
+    $('dane-fingerprint').textContent = '–';
+    return;
+  }
+  const base = `http://${host}:${dane.port}`;
+  setAll('.dane-pac', `${base}/proxy.pac`);
+  setAll('.dane-ca-text', `${base}/dit-dane.crt`);
+  for (const link of document.querySelectorAll('.dane-ca')) link.href = `${base}/dit-dane.crt`;
+  setPill('dane-pill', 'ok', 'Running');
+  $('dane-headline').textContent = `Ready at ${host}:${dane.port}`;
+  $('dane-port').textContent = String(dane.port);
+  $('dane-until').textContent = new Date(dane.caNotAfter).toLocaleDateString('en', {year: 'numeric', month: 'short', day: 'numeric'});
+  $('dane-fingerprint').textContent = dane.caFingerprint;
+}
+
 // The status panel at the bottom of the sidebar, and its short form in the phone header
 function renderChrome(state, title, detail) {
   const dot = el('span', undefined, `dot ${state}`);
@@ -157,6 +180,7 @@ async function refresh() {
     const status = await api('status');
     renderSync(status.hnsd);
     renderDns(status.dns, status.settings);
+    renderDane(status.dane, status.dns);
     renderOverall(status);
     $('version').textContent = `Dit ${status.version}`;
     if (!modeTouched) {
@@ -273,7 +297,7 @@ async function loadLog() {
 
 // ---------- pages ----------
 
-const PAGES = ['overview', 'setup', 'mode', 'log'];
+const PAGES = ['overview', 'setup', 'dane', 'mode', 'log'];
 let currentPage = null;
 
 function route() {

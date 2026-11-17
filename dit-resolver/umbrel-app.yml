@@ -4,7 +4,7 @@ name: Dit
 tagline: Resolve Handshake names on your whole home network
 icon: https://raw.githubusercontent.com/galetaire/dit/main/dit-resolver/dit.png
 category: networking
-version: "0.1.3"
+version: "0.2.0"
 port: 4748
 description: >-
   Dit is a DNS resolver for Handshake (HNS) names that runs on your own
@@ -24,9 +24,10 @@ description: >-
   name and walks you through each setup.
 
 
-  This version resolves names. Sites secured only with DANE still show a
-  certificate warning in the browser: validating DANE for your devices is
-  planned for the next version.
+  Sites secured with DANE (TLSA records) open without a certificate warning
+  too: Dit's proxy checks them for your browsers, with a local certificate
+  you install once per device. That certificate is restricted to Handshake
+  names, so it can never be used against regular sites.
 developer: galetaire
 website: https://github.com/galetaire/dit
 submitter: galetaire
@@ -35,9 +36,10 @@ repo: https://github.com/galetaire/dit
 support: https://github.com/galetaire/dit/issues
 gallery: []
 releaseNotes: >-
-  When the app that had port 53 (Pi-hole, AdGuard Home) is removed, Dit
-  notices: in "DNS server for my network" mode it takes the port by itself,
-  in Automatic mode the Overview page offers it with a "Use port 53" button.
+  DANE for your browsers: a new Secure sites page sets up a proxy that checks
+  Handshake sites' certificates against their TLSA records, with a local
+  certificate restricted to Handshake names. Works in Chrome and Edge on
+  Android and Windows.
 dependencies: []
 path: ""
 defaultUsername: ""

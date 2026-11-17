@@ -9,7 +9,7 @@ device, and no public resolver to trust.
 *Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
 brings to the whole network.
 
-> **Status: v0.1.3, early.** The image builds for amd64 and arm64 and the app
+> **Status: v0.2.0, early.** The image builds for amd64 and arm64 and the app
 > runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
 ## What it does
@@ -25,10 +25,11 @@ brings to the whole network.
 - A page behind the Umbrel login with the sync status, a name tester and setup
   guides for routers, Android, Tailscale, Pi-hole and AdGuard Home.
 
-This version resolves names. A site secured only with DANE (for example one
-hosted with [Castell](https://github.com/galetaire/castell)) still shows a
-certificate warning in the browser. Validating DANE for your devices is the
-plan for v0.2.
+Since v0.2 Dit also validates DANE for your browsers: sites secured only by
+their TLSA record (for example one hosted with
+[Castell](https://github.com/galetaire/castell)) open without a certificate
+warning, through a proxy on the Umbrel and a local CA you install once per
+device. See [DANE proxy](#dane-proxy).
 
 ## How it is built
 
@@ -41,20 +42,26 @@ your devices ──DNS──▶ dns service (dnsproxy, host network)
                         hnsd  recursive resolver :5350
                               root nameserver   127.0.0.1:5349 (status)
                         web UI + API :3000  ◀── Umbrel app_proxy ◀── you
+
+your browsers ──PAC──▶ dane service (dit-dane, host network) :9053
+                        checks TLSA via 127.0.0.1:5300, re-signs with the local CA
 ```
 
 | Service | Network | What runs | Why |
 |---|---|---|---|
 | `server` | Umbrel's Docker network | Node web server, which starts and supervises hnsd | hnsd only answers status queries from localhost, so the UI shares its container |
 | `dns` | host | Node runner, which starts and supervises dnsproxy | Pi-hole and AdGuard Home use host networking and port 53 on Umbrel; host networking lets Dit pick its ports at runtime instead of failing to start |
+| `dane` | host | dit-dane (Go, built on letsdane) | Devices on the LAN reach the proxy directly, and it reaches Dit's resolver on the Umbrel's loopback |
 
-Both services use the same image and share the data folder:
+All services use the same image and share the data folder:
 
 | File | Written by | Content |
 |---|---|---|
 | `data/hnsd/` | hnsd | saved headers (fast restarts) |
 | `data/settings.json` | web server | the listening mode |
 | `data/dns-state.json` | dns runner | ports in use, errors, the Umbrel's addresses |
+| `data/dane/ca.crt`, `ca.key` | dane service | the local CA (key 0600, never leaves the Umbrel) |
+| `data/dane-state.json` | dane service | proxy port, CA fingerprint and expiry |
 
 ### Listening modes
 
@@ -66,6 +73,36 @@ Both services use the same image and share the data folder:
 
 Saving a mode again makes the runner retry port 53. Saving Automatic again also
 forgets its remembered decision.
+
+## DANE proxy
+
+Browsers don't check DANE. The `dane` service (`docker/dane/main.go`) is a
+small Go program built on [letsdane](https://github.com/buffrr/letsdane)
+v0.6.1, the library Fingertip uses:
+
+1. Devices load the auto-config file `http://<umbrel>:9053/proxy.pac`. It
+   sends only Handshake names to the proxy: ICANN names (IANA's list,
+   downloaded at every image build), special-use names (`.local`,
+   `localhost`, `home.arpa`, `.onion`…) and IP addresses go direct.
+2. For a Handshake name, the proxy looks up the TLSA record through Dit
+   (`127.0.0.1:5300`; it trusts the DNSSEC AD flag of that loopback
+   resolver) and checks the site's certificate against it.
+3. If it matches, the browser gets a certificate for the name signed by the
+   local CA, valid for an hour. If not, the connection is closed. Names
+   without TLSA records are tunnelled untouched.
+
+The CA is created on first start (RSA 2048, valid 5 years). Its critical name
+constraints exclude every ICANN TLD, the special-use names and all IP
+addresses, so a certificate it signs is rejected for `gmail.com` or a bank
+even if the key were stolen (`main_test.go` checks this). Devices download it
+from `http://<umbrel>:9053/dit-dane.crt`; the page shows its SHA-256
+fingerprint to compare. The proxy only serves private, loopback and Tailscale
+addresses.
+
+Limits: Android has proxy settings per Wi-Fi network only, and most Android
+apps ignore user-installed CAs (Chrome trusts them). New ICANN TLDs added
+after the CA was created are not in its constraints, though the PAC file of a
+newer image still sends them direct.
 
 ## Install on umbrelOS
 
@@ -86,6 +123,9 @@ forgets its remembered decision.
 - **Never forward port 53 from your router to the Umbrel.** dnsproxy has no
   client allowlist; an open resolver gets abused. ANY queries are refused.
 - hnsd's own resolver is published on the Umbrel's loopback only (15350/udp).
+- **Never forward port 9053 either.** The DANE proxy refuses clients outside
+  private, loopback and Tailscale ranges, but it is meant for your LAN. Its
+  CA key stays in `data/dane/` (0600); the CA cannot sign ICANN names.
 
 ## hnsd patch
 
@@ -99,12 +139,13 @@ not merged. See `docker/Dockerfile`.
 
 ## Known limits
 
-- No DANE validation for browsers yet (v0.2: letsdane proxy and a local CA).
+- DANE works in browsers that use the system proxy and trust user CAs
+  (Chrome, Edge; Firefox with its own settings), not in most Android apps.
 - No encrypted DNS (DoT/DoH) listeners yet. Android's Private DNS field needs
   a publicly trusted certificate, so remote use goes through Tailscale.
 - dnsproxy talks to hnsd over UDP only (hnsd has no TCP listener). hnsd
   accepts answers up to 4096 bytes, which covers normal use.
-- Ports 53, 5300 and 15350 are fixed in `docker-compose.yml`.
+- Ports 53, 5300, 9053 and 15350 are fixed in `docker-compose.yml`.
 - No gallery screenshots yet (`gallery: []` in the manifest).
 
 ## Development
@@ -113,7 +154,10 @@ No npm dependencies. With Node 22+, an hnsd binary and a dnsproxy binary:
 
 ```sh
 cd docker/web
-npm test                       # DNS client unit tests
+npm test                       # DNS client and log filter unit tests
+
+# DANE proxy (Go 1.26), or: docker run --rm -v "$PWD/../dane:/src" -w /src golang:1.26-alpine go test ./...
+cd ../dane && go test ./...
 
 # Web server + hnsd
 DIT_DATA=/tmp/dit DIT_HNSD_BIN=/path/to/hnsd PORT=3900 node server.js
@@ -165,10 +209,22 @@ Tested on an Umbrel (Raspberry Pi, v0.1.0):
 - Real lookups through ports 53 and 5300. This found the aggressive-NSEC
   problem described in [hnsd patch](#hnsd-patch).
 
+On the Umbrel (v0.1.2): Handshake names resolve on port 53 and keep
+resolving after lookups of missing names (the hnsd patch works); a PC and an
+Android phone on the home Wi-Fi resolve Handshake names.
+
+DANE proxy (v0.2, locally, image built with Docker, resolving through the
+Umbrel): Go unit tests (TLD list, client check, PAC file, CA name
+constraints: a leaf for `www.com` is rejected, one for `nathan.woodburn`
+accepted); `nathan.woodburn` and `hnsdoh` load through the proxy with the
+local CA (HTTP 200); without the CA the client rejects them; `example.com`
+is tunnelled with its real certificate; the PAC file sends Handshake names to
+the proxy and ICANN, special-use names and IPs direct.
+
 Not tested yet:
 
-- The hnsd patch on a real Umbrel (since v0.1.1).
-- Android over Wi-Fi and Tailscale, AdGuard Home in front of Dit.
+- The DANE proxy on a real Umbrel, and with a real browser on a phone.
+- AdGuard Home in front of Dit; Tailscale (not used by the maintainer).
 - hnsd serving a whole network for days.
 
 ## Credits and licenses

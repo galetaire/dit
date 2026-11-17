@@ -9,6 +9,8 @@ const path = require('path');
 const DATA_DIR = process.env.DIT_DATA || '/data';
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const DNS_STATE_FILE = path.join(DATA_DIR, 'dns-state.json');
+// Written by the dane service (docker/dane/main.go): port, CA fingerprint
+const DANE_STATE_FILE = path.join(DATA_DIR, 'dane-state.json');
 
 // auto:       use port 53 unless another app already has it (decided once)
 // standalone: Dit is the network's DNS server (port 53 + the alternate port)
@@ -43,10 +45,11 @@ function saveSettings(settings) {
 }
 
 const loadDnsState = () => readJson(DNS_STATE_FILE, null);
+const loadDaneState = () => readJson(DANE_STATE_FILE, null);
 
 function saveDnsState(state) {
   fs.mkdirSync(DATA_DIR, {recursive: true});
   writeAtomic(DNS_STATE_FILE, JSON.stringify(state, null, 2) + '\n');
 }
 
-module.exports = {MODES, DATA_DIR, loadSettings, saveSettings, loadDnsState, saveDnsState};
+module.exports = {MODES, DATA_DIR, loadSettings, saveSettings, loadDnsState, saveDnsState, loadDaneState};

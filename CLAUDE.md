@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.1.3
+## State: v0.2.0
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -71,9 +71,31 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
 
 ## Roadmap
 
-- v0.2: DANE validation at home. letsdane proxy on the Umbrel, PAC file, a
+- v0.2 (built 17 Nov 2026, not yet tested on the Umbrel): DANE validation
+  at home. `dane` service = docker/dane (Go 1.26, letsdane v0.6.1 as a
+  library, deps upgraded, govulncheck clean), port 9053 host network, PAC +
+  CA served by the proxy itself, Secure sites page in the UI (#/dane).
+  Tested locally against the Umbrel's resolver: DANE sites load with the CA.
+  Originally: letsdane proxy on the Umbrel, PAC file, a
   local CA to install per device. Android limits: proxy settings exist only
   per Wi-Fi network; Chrome trusts user CAs, most apps do not.
+  Design notes (17 Nov 2026), modelled on Fingertip
+  (~/Fingertip-dit/third_party/fingertip, internal/config):
+  - letsdane (buffrr/letsdane, Apache-2.0) is quiet: last commit Feb 2024,
+    last release v0.5.0 (2020, no binaries). Fingertip uses tag v0.6.1 as a
+    Go library. Plan: a small Go program in docker/ built in the image,
+    importing letsdane v0.6.1, resolver = Dit's dnsproxy (AD bit needed).
+  - CA: letsdane.NewAuthority with name constraints that EXCLUDE every ICANN
+    TLD, so a leaked Umbrel CA cannot sign gmail.com etc. Fingertip's list
+    (tld.go) is from 2020: regenerate from
+    https://data.iana.org/TLD/tlds-alpha-by-domain.txt at image build time.
+    Fingertip settings: SkipNameChecks=false, Validity=1h.
+  - PAC: everything except ICANN TLDs and IP literals goes to the proxy
+    (Fingertip's getPACScript). Must be reachable WITHOUT the Umbrel login,
+    so the proxy serves /proxy.pac and the CA download itself (letsdane's
+    ContentHandler), not the Dit web UI behind app_proxy.
+  - Proxy port on the host network, LAN only; same rule as port 53: never
+    forward it from the router.
 - v0.3: DANE everywhere through DNS redirection (resolver answers with the
   Umbrel's address for Handshake names with TLSA, Umbrel re-signs with the
   local CA). Blocker to prototype: umbrelOS uses host port 443.

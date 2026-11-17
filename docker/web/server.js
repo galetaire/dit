@@ -43,12 +43,16 @@ function normalizeName(input) {
 async function getStatus() {
   const dns = state.loadDnsState();
   const fresh = !!dns && Date.now() - Date.parse(dns.updatedAt) < DNS_STATE_MAX_AGE;
+  const dane = state.loadDaneState();
+  const daneFresh = !!dane && Date.now() - Date.parse(dane.updatedAt) < DNS_STATE_MAX_AGE;
   return {
     version: require('./package.json').version,
     settings: state.loadSettings(),
     hnsd: await hnsd.status(),
     // null: the dns service has not reported (yet), or stopped reporting
     dns: fresh ? dns : null,
+    // null: the DANE proxy has not reported (yet), or stopped reporting
+    dane: daneFresh ? dane : null,
   };
 }
 

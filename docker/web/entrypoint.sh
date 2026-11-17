@@ -6,7 +6,9 @@ DATA="${DIT_DATA:-/data}"
 # Docker creates a missing bind-mount folder as root: give it to uid/gid 1000
 # (Umbrel's app data owner), then run Dit as that user.
 if [ "$(id -u)" = "0" ]; then
-  mkdir -p "$DATA/hnsd"
+  mkdir -p "$DATA/hnsd" "$DATA/dane"
+  # The dane service keeps its CA key here
+  chmod 700 "$DATA/dane"
   chown -R 1000:1000 "$DATA"
   exec su-exec node "$@"
 fi

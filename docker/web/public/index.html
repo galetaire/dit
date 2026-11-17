@@ -34,6 +34,9 @@
         <a class="side-link" href="#/setup" data-nav="setup">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18h2"/></svg>Set up devices
         </a>
+        <a class="side-link" href="#/dane" data-nav="dane">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.2-3 7.6-7 9-4-1.4-7-4.8-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Secure sites
+        </a>
         <a class="side-link" href="#/mode" data-nav="mode">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Listening mode
         </a>
@@ -203,6 +206,88 @@
               <div>
                 <strong>Never forward port 53</strong>
                 Don't forward port 53 from your router to your Umbrel. A resolver open to the internet gets abused for attacks on others.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== Secure sites (DANE) ===== -->
+      <section class="page" data-page="dane" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Secure sites</h1>
+            <p>Many Handshake sites prove their HTTPS certificate with a DNS record (DANE) instead of a certificate authority. Browsers don't check that, so Dit's proxy checks it for them.</p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <div class="card-head">
+              <h2>DANE proxy</h2>
+              <span class="pill idle" id="dane-pill">…</span>
+            </div>
+            <p class="big" id="dane-headline">…</p>
+            <dl class="facts">
+              <div class="wide"><dt>Auto-config (PAC) address</dt><dd><code class="dane-pac">http://your-umbrel:9053/proxy.pac</code></dd></div>
+              <div><dt>Proxy port</dt><dd id="dane-port">–</dd></div>
+              <div><dt>Certificate valid until</dt><dd id="dane-until">–</dd></div>
+            </dl>
+          </article>
+
+          <article class="card">
+            <h2>Dit's certificate</h2>
+            <p class="lead">Install it once on each device. The proxy uses it to show you sites it has checked.</p>
+            <p><a class="button primary dane-ca" href="#/dane" download="dit-dane.crt">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download certificate</a></p>
+            <dl class="facts">
+              <div class="wide"><dt>SHA-256 fingerprint</dt><dd id="dane-fingerprint">–</dd></div>
+            </dl>
+            <p class="note">It can only vouch for Handshake names: it is technically barred from every regular domain (.com, .org, your bank…), so even if someone stole it from your Umbrel it could not be used against those sites.</p>
+          </article>
+        </div>
+
+        <div class="columns">
+          <div class="col-main">
+            <article class="card">
+              <h2>Android (Chrome)</h2>
+              <p class="lead">Once per phone, and the proxy once per Wi-Fi network.</p>
+              <ol class="steps">
+                <li>On the phone, open <code class="dane-ca-text">http://your-umbrel:9053/dit-dane.crt</code> in Chrome to download the certificate.</li>
+                <li>Settings → Security &amp; privacy → More security settings → Encryption &amp; credentials → <strong>Install a certificate</strong> → <strong>CA certificate</strong> → Install anyway, and pick <code>dit-dane.crt</code>.</li>
+                <li>Settings → Network &amp; internet → Internet → your Wi-Fi → edit → Advanced → <strong>Proxy: Auto-config</strong>, and enter <code class="dane-pac">http://your-umbrel:9053/proxy.pac</code> as the PAC URL. Save.</li>
+                <li>Open a Handshake site that uses DANE, for example <code>nathan.woodburn/</code>. It loads without a certificate warning.</li>
+              </ol>
+              <p class="note">Chrome trusts the certificate; most other Android apps ignore certificates you install yourself. The proxy setting only applies on that Wi-Fi network. Menu names differ a little between phone brands.</p>
+            </article>
+
+            <article class="card">
+              <h2>Windows (Chrome and Edge)</h2>
+              <ol class="steps">
+                <li>Download the certificate, open it, and choose <strong>Install Certificate</strong> → Current User → <strong>Place all certificates in the following store</strong> → Trusted Root Certification Authorities. Check that the fingerprint matches the one on this page.</li>
+                <li>Settings → Network &amp; internet → Proxy → <strong>Use setup script</strong> → Set up, and enter <code class="dane-pac">http://your-umbrel:9053/proxy.pac</code> as the script address. Save.</li>
+                <li>Restart the browser.</li>
+              </ol>
+              <p class="note">Firefox has its own settings: Settings → Network Settings → Automatic proxy configuration URL, and Privacy &amp; Security → View Certificates → Authorities → Import (trust it to identify websites).</p>
+            </article>
+          </div>
+
+          <div class="col-side">
+            <article class="card">
+              <h2>How it works</h2>
+              <ol class="steps">
+                <li>The auto-config file sends only Handshake names to the proxy. Every regular site goes straight to the internet, as before.</li>
+                <li>The proxy looks up the site's TLSA record through Dit, verified with DNSSEC, and checks the site's certificate against it.</li>
+                <li>If it matches, the proxy hands your browser a copy signed by Dit's certificate. If not, the page doesn't open.</li>
+              </ol>
+              <p class="note">Handshake sites without DANE are passed through untouched and behave as they do today.</p>
+            </article>
+
+            <div class="risk-box">
+              <span class="risk-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+              <div>
+                <strong>Keep it on your network</strong>
+                Don't forward port 9053 from your router. The proxy only answers devices on your local network, but it should never face the internet.
               </div>
             </div>
           </div>

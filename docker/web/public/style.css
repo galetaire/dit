@@ -232,8 +232,8 @@ button, .button {
   font: inherit; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer;
 }
 button:hover, .button:hover { border-color: var(--accent); color: var(--text); }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-text); }
+button.primary, .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+button.primary:hover, .button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-text); }
 button:disabled { opacity: .6; cursor: progress; }
 .actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .actions.end { padding-top: 18px; border-top: 1px solid var(--border); }
