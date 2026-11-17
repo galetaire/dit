@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.3.0
+## State: v0.3.1
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -110,7 +110,18 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
   net-state.json); rewriter + fronts always run, rewrite only while on; dns
   runner switches upstream to the rewriter with hnsd as --fallback; the v0.2
   proxy now resolves via hnsd 127.0.0.1:15350. E2E-tested in Docker with
-  all services; NOT yet run on the Umbrel. Prototype notes:
+  all services. On the Umbrel (17 Nov 2026, extra address 192.168.1.200 on
+  wlan0, net-state active): DANE names answer .200, AAAA empty, others
+  unchanged; HTTPS to .200 with no proxy: nathan.woodburn and hnsdoh 200;
+  http -> 301 https; umbrelOS's own 443 on .27 untouched. Phone without the
+  proxy setting: not yet tested. Windows PC (headless Chrome, user's CA in
+  CurrentUser\Root): nathan.woodburn loads with no proxy; single-word names
+  (hnsdoh, woodburn) give ERR_NAME_NOT_RESOLVED because Windows never sends
+  single-label names to DNS; with the PAC script set they load. Trailing dot
+  (hnsdoh.) resolves but letsdane closes: SNI "hnsdoh." != TLSA domain.
+  woodburn's own nginx returns 502 (site down, not Dit). The Secure sites
+  page now says to keep the PAC script on Windows and has a Firefox card
+  (DoH off, CA trust), released as 0.3.1. Prototype notes:
   - Blocker confirmed: umbrelOS "Local HTTPS" answers 443 on every Umbrel
     address for every SNI ("Umbrel Local HTTPS CA").
   - Way around: a second LAN address for Dit. docker/dane/dit-net.sh (host

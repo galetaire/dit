@@ -9,7 +9,7 @@ device, and no public resolver to trust.
 *Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
 brings to the whole network.
 
-> **Status: v0.3.0, early.** The image builds for amd64 and arm64 and the app
+> **Status: v0.3.1, early.** The image builds for amd64 and arm64 and the app
 > runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
 ## What it does
@@ -186,6 +186,13 @@ not merged. See `docker/Dockerfile`.
   `docker-compose.yml`.
 - DANE without proxy settings uses IPv4 only (AAAA answers for DANE names
   are empty) and needs a free address in the Umbrel's own subnet.
+- Windows never sends single-word names (`mysite`) to DNS
+  (`ERR_NAME_NOT_RESOLVED` in Chrome), so without the PAC file only names
+  with a dot open there. With the PAC file the proxy resolves them itself.
+  A trailing dot (`mysite.`) does reach DNS, but the DANE check then sees
+  `mysite.` as a different name and closes the connection.
+- Firefox needs DNS over HTTPS off and Dit's CA in its own store (or, on
+  Android, "Use third party CA certificates" in its secret settings).
 - No gallery screenshots yet (`gallery: []` in the manifest).
 
 ## Development

@@ -271,7 +271,7 @@
             <button type="submit" class="primary" id="redirect-button">Save</button>
             <span class="note inline" id="redirect-saved" aria-live="polite"></span>
           </div>
-          <p class="note">When it is on, devices can drop the auto-config proxy setting. Devices that keep it still work. Turning it off removes the extra address again.</p>
+          <p class="note">When it is on, devices can drop the auto-config proxy setting. Devices that keep it still work, and Windows needs it for single-word names (see Windows below). Turning it off removes the extra address again.</p>
         </form>
 
         <div class="columns">
@@ -295,7 +295,17 @@
                 <li>Settings → Network &amp; internet → Proxy → <strong>Use setup script</strong> → Set up, and enter <code class="dane-pac">http://your-umbrel:9053/proxy.pac</code> as the script address. Save.</li>
                 <li>Restart the browser.</li>
               </ol>
-              <p class="note">Firefox has its own settings: Settings → Network Settings → Automatic proxy configuration URL, and Privacy &amp; Security → View Certificates → Authorities → Import (trust it to identify websites).</p>
+              <p class="note"><strong>Keep the setup script on Windows</strong>, even with "Without proxy settings" on: Windows never looks up single-word names like <code>mysite/</code>, so without the script only names with a dot (<code>www.mysite/</code>) open. The script sends every Handshake name to Dit's proxy, which looks it up itself.</p>
+            </article>
+
+            <article class="card">
+              <h2>Firefox</h2>
+              <p class="lead">Firefox has its own DNS and its own certificate store, so it needs two settings Chrome doesn't.</p>
+              <ol class="steps">
+                <li>Turn <strong>DNS over HTTPS</strong> off. Otherwise Firefox asks a public resolver, which doesn't know Handshake names ("We're having trouble finding that site"). Android: Settings → Privacy and security → DNS over HTTPS → Off. Windows: Settings → Privacy &amp; Security → DNS over HTTPS → Off.</li>
+                <li>Trust Dit's certificate. Android: install it in Android as above, then Settings → About Firefox → tap the Firefox logo 5 times → back in Settings, Secret Settings → <strong>Use third party CA certificates</strong>. Windows: Settings → Privacy &amp; Security → Certificates → View Certificates → Authorities → <strong>Import</strong>, and tick "Trust this CA to identify websites".</li>
+                <li>For the proxy, Windows: Settings → Network Settings → <strong>Automatic proxy configuration URL</strong>, with the address above. Android: Firefox uses the Wi-Fi proxy setting.</li>
+              </ol>
             </article>
           </div>
 

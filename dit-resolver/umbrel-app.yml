@@ -4,7 +4,7 @@ name: Dit
 tagline: Resolve Handshake names on your whole home network
 icon: https://raw.githubusercontent.com/galetaire/dit/main/dit-resolver/dit.png
 category: networking
-version: "0.3.0"
+version: "0.3.1"
 port: 4748
 description: >-
   Dit is a DNS resolver for Handshake (HNS) names that runs on your own
@@ -37,11 +37,10 @@ repo: https://github.com/galetaire/dit
 support: https://github.com/galetaire/dit/issues
 gallery: []
 releaseNotes: >-
-  DANE without proxy settings (beta, opt-in on the Secure sites page): devices
-  that use Dit as their DNS server open DANE sites with only Dit's
-  certificate installed. Dit uses an extra address on your network for this,
-  because umbrelOS keeps port 443 of its own address; a new helper service
-  adds and removes that address.
+  Clearer setup on the Secure sites page: on Windows, keep the setup script
+  so single-word Handshake names open too (Windows never looks them up
+  itself), and a new Firefox section (turn off DNS over HTTPS, trust Dit's
+  certificate).
 dependencies: []
 path: ""
 defaultUsername: ""

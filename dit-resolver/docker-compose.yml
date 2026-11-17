@@ -10,7 +10,7 @@ services:
   # Web UI + hnsd (the Handshake light client and its recursive resolver).
   # They share a container because hnsd only answers status queries from localhost.
   server:
-    image: ghcr.io/galetaire/dit:0.3.0
+    image: ghcr.io/galetaire/dit:0.3.1
     restart: on-failure
     stop_grace_period: 30s
     environment:
@@ -32,7 +32,7 @@ services:
   # network's DNS server, or only 5300 when Pi-hole/AdGuard Home (which also use
   # host networking and port 53 on Umbrel) are in front of it.
   dns:
-    image: ghcr.io/galetaire/dit:0.3.0
+    image: ghcr.io/galetaire/dit:0.3.1
     restart: on-failure
     network_mode: host
     # Root with just enough to bind port 53 and write its state file
@@ -64,7 +64,7 @@ services:
   # and the fronts that the net service's firewall rules send traffic to
   # (TLS 9443, HTTP 9080).
   dane:
-    image: ghcr.io/galetaire/dit:0.3.0
+    image: ghcr.io/galetaire/dit:0.3.1
     restart: on-failure
     network_mode: host
     # Same owner as the app data; port 9053 needs no privileges
@@ -92,7 +92,7 @@ services:
   # removes them when the feature is switched off or the app stops.
   # umbrelOS keeps port 443 of the Umbrel's own address for its own HTTPS.
   net:
-    image: ghcr.io/galetaire/dit:0.3.0
+    image: ghcr.io/galetaire/dit:0.3.1
     restart: on-failure
     network_mode: host
     stop_grace_period: 15s
