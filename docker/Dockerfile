@@ -40,8 +40,9 @@ RUN wget -qO /icann-tlds.txt https://data.iana.org/TLD/tlds-alpha-by-domain.txt 
 # ---- Dit ----
 FROM node:22-alpine
 
-# unbound-libs: hnsd's resolver; su-exec drops root after fixing ownership
-RUN apk add --no-cache unbound-libs su-exec tini
+# unbound-libs: hnsd's resolver; su-exec drops root after fixing ownership;
+# iproute2, iptables (and busybox arping): "dit-dane net", DANE without proxy settings
+RUN apk add --no-cache unbound-libs su-exec tini iproute2 iptables iptables-legacy
 
 COPY --from=hnsd /hnsd/hnsd /usr/local/bin/hnsd
 COPY --from=dnsproxy /dnsproxy /usr/local/bin/dnsproxy

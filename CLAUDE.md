@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.2.0
+## State: v0.3.0
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -71,7 +71,11 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
 
 ## Roadmap
 
-- v0.2 (built 17 Nov 2026, not yet tested on the Umbrel): DANE validation
+- v0.2 DONE (0.2.0 on the Umbrel 17 Nov 2026: proxy on 9053, PAC names
+  192.168.1.27:9053, nathan.woodburn and hnsdoh load with the CA; Android
+  phone with Chrome, CA installed and Wi-Fi proxy on auto-config, works.
+  The Umbrel has a fixed address, 192.168.1.27, reserved in the router,
+  which hands it out as the only DNS server): DANE validation
   at home. `dane` service = docker/dane (Go 1.26, letsdane v0.6.1 as a
   library, deps upgraded, govulncheck clean), port 9053 host network, PAC +
   CA served by the proxy itself, Secure sites page in the UI (#/dane).
@@ -99,6 +103,39 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
 - v0.3: DANE everywhere through DNS redirection (resolver answers with the
   Umbrel's address for Handshake names with TLSA, Umbrel re-signs with the
   local CA). Blocker to prototype: umbrelOS uses host port 443.
+  Built as 0.3.0 (17 Nov 2026, opt-in "Without proxy settings (beta)" card on
+  the Secure sites page; settings.json redirect {enabled, ip, savedAt},
+  separate from the mode's savedAt so Automatic keeps its decision). The
+  shell helper became "dit-dane net" (netsetup.go, net service, state in
+  net-state.json); rewriter + fronts always run, rewrite only while on; dns
+  runner switches upstream to the rewriter with hnsd as --fallback; the v0.2
+  proxy now resolves via hnsd 127.0.0.1:15350. E2E-tested in Docker with
+  all services; NOT yet run on the Umbrel. Prototype notes:
+  - Blocker confirmed: umbrelOS "Local HTTPS" answers 443 on every Umbrel
+    address for every SNI ("Umbrel Local HTTPS CA").
+  - Way around: a second LAN address for Dit. docker/dane/dit-net.sh (host
+    network, NET_ADMIN + NET_RAW) adds DIT_REDIRECT_IP to the interface
+    (ARP duplicate check, refuses lo) and two nat PREROUTING REDIRECT rules
+    tagged "dit-redirect": IP:443 -> 9443, IP:80 -> 9080. Removes them on
+    SIGTERM; survives kill -9 + restart without duplicates.
+  - docker/dane/redirect.go (on when DIT_REDIRECT_IP is set): DNS rewriter
+    on 127.0.0.1:15351 (A -> DIT_REDIRECT_IP, AAAA/HTTPS/SVCB -> no records
+    for names with AD-validated TLSA usage 2/3; everything else passed
+    through from DIT_REWRITE_UPSTREAM); SNI front on 9443 that hands the
+    connection to the v0.2 proxy as a CONNECT (same DANE check, same CA);
+    HTTP 9080 -> 301 https.
+  - Tested in Docker with a simulated Umbrel resolving through the real one:
+    rewrite correct (DANE names -> alias, humbly/ICANN untouched), HTTPS
+    to the alias with no proxy setting: nathan.woodburn HTTP/2 200 with the
+    Dit CA, hnsdoh 200, untrusted without the CA, ICANN SNI refused.
+  - To ship: dns service upstream 127.0.0.1:15351 with dnsproxy --fallback
+    127.0.0.1:15350 (DNS keeps working if dane dies); the v0.2 proxy must
+    resolve via hnsd directly (127.0.0.1:15350), else it would loop into the
+    alias; a privileged "net" service in compose; a UI setting to pick the
+    address (outside the DHCP range, here .200-.254) and switch it on.
+    Unknowns on the Umbrel: iptables backend, a second address on wlan0,
+    whether NET_ADMIN is acceptable for the community store (Tailscale uses
+    it).
 
 ## Decisions already made
 

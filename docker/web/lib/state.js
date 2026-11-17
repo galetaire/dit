@@ -33,6 +33,22 @@ function writeAtomic(file, text, mode = 0o644) {
   fs.renameSync(tmp, file);
 }
 
+// DANE without proxy settings: a private IPv4 address, not .0 or .255.
+// The same rule as validRedirectIP in docker/dane/settings.go.
+function validRedirectIp(value) {
+  const parts = String(value || '').trim().split('.');
+  if (parts.length !== 4 || !parts.every(p => /^\d{1,3}$/.test(p) && Number(p) <= 255)) return false;
+  const [a, b, , d] = parts.map(Number);
+  const isPrivate = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  return isPrivate && d !== 0 && d !== 255;
+}
+
+// Is DANE without proxy settings switched on, with a usable address?
+function redirectEnabled(settings) {
+  const redirect = settings.redirect || {};
+  return redirect.enabled === true && validRedirectIp(redirect.ip);
+}
+
 function loadSettings() {
   const settings = {...DEFAULT_SETTINGS, ...readJson(SETTINGS_FILE, {})};
   if (!MODES.includes(settings.mode)) settings.mode = DEFAULT_SETTINGS.mode;
@@ -52,4 +68,11 @@ function saveDnsState(state) {
   writeAtomic(DNS_STATE_FILE, JSON.stringify(state, null, 2) + '\n');
 }
 
-module.exports = {MODES, DATA_DIR, loadSettings, saveSettings, loadDnsState, saveDnsState, loadDaneState};
+// Written by the net service ("dit-dane net"): the extra address it set up
+const NET_STATE_FILE = path.join(DATA_DIR, 'net-state.json');
+const loadNetState = () => readJson(NET_STATE_FILE, null);
+
+module.exports = {
+  MODES, DATA_DIR, loadSettings, saveSettings, loadDnsState, saveDnsState, loadDaneState, loadNetState,
+  validRedirectIp, redirectEnabled,
+};

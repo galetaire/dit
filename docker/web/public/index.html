@@ -247,6 +247,33 @@
           </article>
         </div>
 
+        <form class="card stack" id="redirect-form">
+          <div>
+            <div class="card-head">
+              <h2>Without proxy settings <span class="badge small">Beta</span></h2>
+              <span class="pill idle" id="redirect-pill">Off</span>
+            </div>
+            <p class="lead">Devices that use Dit as their DNS server open DANE sites without the auto-config proxy: only the certificate is needed. Dit answers those names with an extra address of its own on your network, because umbrelOS already uses port 443 on the Umbrel's address.</p>
+          </div>
+          <div class="grid-fields">
+            <label>
+              <span class="field-label">Extra address for Dit</span>
+              <span class="hint">A free address outside your router's DHCP range (the range it hands out to devices). Nothing else may use it.</span>
+              <input type="text" id="redirect-ip" placeholder="for example 192.168.1.200" autocomplete="off" spellcheck="false" inputmode="decimal">
+            </label>
+            <label class="check-label">
+              <input type="checkbox" id="redirect-enabled">
+              Use DANE without proxy settings
+            </label>
+          </div>
+          <p class="note fail" id="redirect-error" hidden></p>
+          <div class="actions end">
+            <button type="submit" class="primary" id="redirect-button">Save</button>
+            <span class="note inline" id="redirect-saved" aria-live="polite"></span>
+          </div>
+          <p class="note">When it is on, devices can drop the auto-config proxy setting. Devices that keep it still work. Turning it off removes the extra address again.</p>
+        </form>
+
         <div class="columns">
           <div class="col-main">
             <article class="card">
@@ -255,7 +282,7 @@
               <ol class="steps">
                 <li>On the phone, open <code class="dane-ca-text">http://your-umbrel:9053/dit-dane.crt</code> in Chrome to download the certificate.</li>
                 <li>Settings → Security &amp; privacy → More security settings → Encryption &amp; credentials → <strong>Install a certificate</strong> → <strong>CA certificate</strong> → Install anyway, and pick <code>dit-dane.crt</code>.</li>
-                <li>Settings → Network &amp; internet → Internet → your Wi-Fi → edit → Advanced → <strong>Proxy: Auto-config</strong>, and enter <code class="dane-pac">http://your-umbrel:9053/proxy.pac</code> as the PAC URL. Save.</li>
+                <li>Settings → Network &amp; internet → Internet → your Wi-Fi → edit → Advanced → <strong>Proxy: Auto-config</strong>, and enter <code class="dane-pac">http://your-umbrel:9053/proxy.pac</code> as the PAC URL. Save. Skip this step when "Without proxy settings" above is on.</li>
                 <li>Open a Handshake site that uses DANE, for example <code>nathan.woodburn/</code>. It loads without a certificate warning.</li>
               </ol>
               <p class="note">Chrome trusts the certificate; most other Android apps ignore certificates you install yourself. The proxy setting only applies on that Wi-Fi network. Menu names differ a little between phone brands.</p>
