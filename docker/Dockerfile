@@ -3,8 +3,16 @@ FROM alpine:3.20 AS hnsd
 RUN apk add --no-cache build-base bash automake autoconf libtool unbound-dev git
 # handshake-org/hnsd master, 2026-08-19 (checkpoint sync and saved headers)
 ARG HNSD_COMMIT=0cb70e565b1b659bf85484e1a445825be306fda1
+# Patch: turn off unbound's aggressive NSEC (on by default since unbound 1.15).
+# hnsd proves a missing name with an NSEC record that covers the whole root
+# zone (". -> .", resource.c hsk_resource_to_nx), so with aggressive NSEC one
+# lookup of any missing name makes unbound deny every Handshake name for 24h.
+# The proper fix, handshake-org/hnsd#86, is unmerged. The grep fails the build
+# if the line moved upstream and the patch no longer applies.
 RUN git clone https://github.com/handshake-org/hnsd.git /hnsd \
  && cd /hnsd && git checkout "$HNSD_COMMIT" \
+ && sed -i 's|ub_ctx_set_option(ns->ub, "qname-minimisation:", "yes");|& ub_ctx_set_option(ns->ub, "aggressive-nsec:", "no");|' src/rs.c \
+ && grep -q '"aggressive-nsec:", "no"' src/rs.c \
  && ./autogen.sh && ./configure && make
 
 # ---- dnsproxy: the DNS front end (AdGuard, Apache-2.0) ----

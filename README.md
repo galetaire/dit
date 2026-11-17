@@ -9,9 +9,8 @@ device, and no public resolver to trust.
 *Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
 brings to the whole network.
 
-> **Status: v0.1.0 scaffold.** The web server, the DNS runner and their logic
-> are tested (see [Tested and not tested](#tested-and-not-tested)). The Docker
-> image has not been built yet and the app has not run on an Umbrel.
+> **Status: v0.1.1, early.** The image builds for amd64 and arm64 and the app
+> runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
 ## What it does
 
@@ -70,7 +69,7 @@ Saving a mode again makes the runner retry port 53.
 ## Install on umbrelOS
 
 1. Push this repository to GitHub and let the workflow build
-   `ghcr.io/galetaire/dit:0.1.0` (make the package public).
+   `ghcr.io/galetaire/dit:<version>` (make the package public).
 2. In umbrelOS: App Store → ⋯ → Community App Stores → add
    `https://github.com/galetaire/dit`.
 3. Install Dit and open it.
@@ -87,7 +86,17 @@ Saving a mode again makes the runner retry port 53.
   client allowlist; an open resolver gets abused. ANY queries are refused.
 - hnsd's own resolver is published on the Umbrel's loopback only (15350/udp).
 
-## Known limits in 0.1.0
+## hnsd patch
+
+The image builds hnsd with unbound's `aggressive-nsec` turned off. hnsd
+cannot prove that a single Handshake name is missing, so it answers with an
+NSEC record that makes the whole root zone look empty (`. → .`, 24 hours).
+With aggressive NSEC, on by default since unbound 1.15, unbound then denies
+every Handshake name until that record expires. The proper fix upstream,
+[handshake-org/hnsd#86](https://github.com/handshake-org/hnsd/pull/86), is
+not merged. See `docker/Dockerfile`.
+
+## Known limits
 
 - No DANE validation for browsers yet (v0.2: letsdane proxy and a local CA).
 - No encrypted DNS (DoT/DoH) listeners yet. Android's Private DNS field needs
@@ -144,14 +153,21 @@ Tested locally (Node 22, hnsd built from the pinned commit, dnsproxy v0.86.0):
   port-53-busy fallback (pinned and automatic), the remembered decision after
   a restart, restart of a killed dnsproxy, clean shutdown of both children.
 - API: source check, `X-Dit` header, name validation.
+- Log filter: Dit's status queries are dropped, lines split across chunks are joined.
+
+Tested on an Umbrel (Raspberry Pi, v0.1.0):
+
+- The image build for amd64 and arm64 and the GitHub workflow.
+- Install from the community store, `app_proxy`, header sync to the tip.
+- Port 53 taken by Pi-hole: automatic mode fell back to port 5300; after
+  removing Pi-hole, standalone mode got port 53.
+- Real lookups through ports 53 and 5300. This found the aggressive-NSEC
+  problem described in [hnsd patch](#hnsd-patch).
 
 Not tested yet:
 
-- The Docker build (Alpine, both architectures) and the GitHub workflow.
-- Anything on a real Umbrel: `app_proxy`, host networking next to Pi-hole,
-  AdGuard Home and Tailscale, and whether umbrelOS leaves port 53 free.
-- A full header sync and real lookups. The test machine had no route to the
-  Handshake network or to outside DNS servers, so lookups returned SERVFAIL.
+- The hnsd patch on a real Umbrel (v0.1.1).
+- Android over Wi-Fi and Tailscale, AdGuard Home in front of Dit.
 - hnsd serving a whole network for days.
 
 ## Credits and licenses

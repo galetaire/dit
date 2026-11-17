@@ -4,7 +4,7 @@ name: Dit
 tagline: Resolve Handshake names on your whole home network
 icon: https://raw.githubusercontent.com/galetaire/dit/main/dit-resolver/dit.png
 category: networking
-version: "0.1.0"
+version: "0.1.1"
 port: 4748
 description: >-
   Dit is a DNS resolver for Handshake (HNS) names that runs on your own
@@ -35,9 +35,10 @@ repo: https://github.com/galetaire/dit
 support: https://github.com/galetaire/dit/issues
 gallery: []
 releaseNotes: >-
-  First version: Handshake resolver (hnsd) for your network, with a status
-  page, a name tester and setup guides for routers, Android, Tailscale,
-  Pi-hole and AdGuard Home.
+  Fixes Handshake names stopping to resolve: after any lookup of a name that
+  does not exist, every Handshake name failed for up to 24 hours. The log on
+  the status page now shows hnsd's activity instead of Dit's own status
+  checks.
 dependencies: []
 path: ""
 defaultUsername: ""

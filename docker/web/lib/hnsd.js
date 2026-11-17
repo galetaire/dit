@@ -30,13 +30,58 @@ let restarts = 0;
 let lastExit = null;
 const logLines = [];
 
-function pushLog(text) {
-  for (const line of String(text).split('\n')) {
-    if (!line.trim()) continue;
-    logLines.push(line);
-    if (logLines.length > MAX_LOG_LINES) logLines.shift();
-  }
+function addLine(line) {
+  if (!line.trim()) return;
+  logLines.push(line);
+  if (logLines.length > MAX_LOG_LINES) logLines.shift();
 }
+
+// Turns hnsd's output into whole lines and drops the blocks hnsd logs for
+// Dit's own status queries (Hesiod TXT for *.hnsd., several per second while
+// the page is open), which would otherwise fill the whole log.
+// hnsd logs each root-server query as "ns: query" followed by indented
+// "ns:   key=value" lines ending with "ns:   addr=...".
+function createLogFilter(emit) {
+  let partial = '';
+  let block = null;
+  const flushBlock = () => {
+    if (block) block.forEach(emit);
+    block = null;
+  };
+  const line = text => {
+    if (/^ns: query\s*$/.test(text)) {
+      flushBlock();
+      block = [text];
+    } else if (block && /^ns:\s{2,}\S/.test(text)) {
+      block.push(text);
+      if (/^ns:\s+addr=/.test(text)) {
+        if (!block.some(l => /^ns:\s+tld=hnsd\s*$/.test(l))) flushBlock();
+        block = null;
+      } else if (block.length > 20) {
+        flushBlock();
+      }
+    } else {
+      flushBlock();
+      emit(text);
+    }
+  };
+  return {
+    // Output arrives in chunks that can end mid-line: keep the tail for later
+    write(chunk) {
+      const lines = (partial + String(chunk)).split('\n');
+      partial = lines.pop();
+      lines.forEach(line);
+    },
+    end() {
+      if (partial) line(partial);
+      partial = '';
+      flushBlock();
+    },
+  };
+}
+
+// Dit's own messages: always whole lines
+const pushLog = message => addLine(String(message));
 
 function start() {
   if (process.env.DIT_HNSD_DISABLED === 'true') {
@@ -49,13 +94,18 @@ function start() {
   pushLog(`[dit] starting: ${HNSD_BIN} ${args.join(' ')}`);
   startedAt = Date.now();
   child = spawn(HNSD_BIN, args, {stdio: ['ignore', 'pipe', 'pipe']});
-  child.stdout.on('data', pushLog);
-  child.stderr.on('data', pushLog);
-  child.on('error', err => {
-    lastExit = `could not start hnsd: ${err.message}`;
+  // One filter per stream, so a line cut between chunks is joined correctly
+  const out = createLogFilter(addLine);
+  const err = createLogFilter(addLine);
+  child.stdout.on('data', chunk => out.write(chunk));
+  child.stderr.on('data', chunk => err.write(chunk));
+  child.on('error', e => {
+    lastExit = `could not start hnsd: ${e.message}`;
     pushLog(`[dit] ${lastExit}`);
   });
   child.on('close', (code, signal) => {
+    out.end();
+    err.end();
     child = null;
     if (stopping) return;
     lastExit = `hnsd stopped (${signal || `exit code ${code}`})`;
@@ -119,4 +169,4 @@ function lookup(name, type) {
   return dnsclient.query({host: '127.0.0.1', port: RS_PORT, name, type});
 }
 
-module.exports = {start, stop, status, lookup, log: () => logLines.slice(), RS_PORT, NS_PORT};
+module.exports = {start, stop, status, lookup, log: () => logLines.slice(), createLogFilter, RS_PORT, NS_PORT};
