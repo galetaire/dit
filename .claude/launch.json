@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dit-ui",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["docker/web/server.js"],
+      "env": {
+        "PORT": "3900",
+        "DIT_DATA": ".dev-data",
+        "DIT_HNSD_DISABLED": "true",
+        "DIT_ALLOW_ANY_SOURCE": "true"
+      },
+      "port": 3900
+    }
+  ]
+}

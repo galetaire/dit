@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.1.1
+## State: v0.1.2
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -26,7 +26,13 @@ state-changing requests, multi-arch GitHub workflow, image tag = app version.
   Modes: auto / standalone (53 + 5300) / upstream (5300 only). Reason: Pi-hole,
   AdGuard Home and Tailscale all use host networking on Umbrel, and the first
   two bind port 53.
-- UI: light purple palette, fingerprint icon, IBM Plex fonts.
+- UI (0.1.2): Castell's layout (dark sidebar with nav, status panel and
+  theme toggle; pages #/, #/setup, #/mode, #/log as sections of index.html
+  shown by hash) with a violet accent instead of Castell's rust. Light/dark
+  via data-theme on <html>, set by `public/theme.js` (CSP forbids inline
+  scripts): saved choice (`dit-theme` in localStorage), else system setting.
+  Fingerprint icon, IBM Plex fonts. Local preview: `.claude/launch.json`
+  ("dit-ui", hnsd disabled, data in gitignored `.dev-data/`).
 - App id `dit-resolver`, store id `dit`, UI port 4748, image
   `ghcr.io/galetaire/dit`.
 
@@ -47,7 +53,7 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
 1. ~~Move `build-image.yml` from the repo root to `.github/workflows/`.~~ Done.
 2. ~~Push as `galetaire/dit`; build the image; make the ghcr package public.~~ Done.
 3. ~~Install from the community store on the Umbrel; watch the first sync.~~
-   Done; then update to 0.1.1 and confirm Handshake names resolve.
+   Done; then update to 0.1.2 and confirm Handshake names resolve.
 4. ~~Check port 53.~~ Pi-hole was installed and held it; user removed it.
    Note: "Automatic" remembers its first decision, so after removing a DNS
    app the user must pick "DNS server for my network" explicitly.

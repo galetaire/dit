@@ -10,7 +10,7 @@ services:
   # Web UI + hnsd (the Handshake light client and its recursive resolver).
   # They share a container because hnsd only answers status queries from localhost.
   server:
-    image: ghcr.io/galetaire/dit:0.1.1
+    image: ghcr.io/galetaire/dit:0.1.2
     restart: on-failure
     stop_grace_period: 30s
     environment:
@@ -32,7 +32,7 @@ services:
   # network's DNS server, or only 5300 when Pi-hole/AdGuard Home (which also use
   # host networking and port 53 on Umbrel) are in front of it.
   dns:
-    image: ghcr.io/galetaire/dit:0.1.1
+    image: ghcr.io/galetaire/dit:0.1.2
     restart: on-failure
     network_mode: host
     # Root with just enough to bind port 53 and write its state file

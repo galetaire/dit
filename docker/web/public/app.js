@@ -1,7 +1,8 @@
 'use strict';
 
 // Dit's page: polls /api/status, runs test lookups and saves the listening mode.
-// No framework; text is always set with textContent, never as HTML.
+// Pages are sections of index.html shown by the URL hash (#/, #/setup, #/mode, #/log).
+// No framework; dynamic text is always set with textContent, never as HTML.
 
 const $ = id => document.getElementById(id);
 const MODE_NAMES = {
@@ -44,9 +45,16 @@ function ago(unixSeconds) {
 
 let modeTouched = false;
 
+function setPill(id, state, text) {
+  const pill = $(id);
+  pill.className = `pill ${state}`;
+  pill.textContent = text;
+}
+
 function renderSync(hnsd) {
   const percent = hnsd.progress === null ? 0 : Math.min(100, Math.round(hnsd.progress * 1000) / 10);
   $('sync-fill').style.width = `${hnsd.synced ? 100 : percent}%`;
+  $('sync-bar').classList.toggle('done', !!hnsd.synced);
   $('sync-bar').setAttribute('aria-valuenow', String(hnsd.synced ? 100 : percent));
   $('sync-height').textContent = hnsd.height === null ? '–' : hnsd.height.toLocaleString('en');
   $('sync-peers').textContent = hnsd.peers === null ? '–' : String(hnsd.peers);
@@ -69,6 +77,9 @@ function renderSync(hnsd) {
   }
   $('sync-headline').textContent = headline;
   $('sync-note').textContent = note;
+  if (!hnsd.reachable) setPill('sync-pill', hnsd.running ? 'warn' : 'fail', hnsd.running ? 'Starting' : 'Stopped');
+  else if (hnsd.synced) setPill('sync-pill', 'ok', 'Synced');
+  else setPill('sync-pill', 'warn', 'Syncing');
 }
 
 function renderDns(dns, settings) {
@@ -80,6 +91,7 @@ function renderDns(dns, settings) {
     $('dns-headline').textContent = 'Waiting for the DNS service…';
     $('dns-ports').textContent = '–';
     $('dns-addresses').textContent = '–';
+    setPill('dns-pill', 'warn', 'Starting');
     return;
   }
 
@@ -93,35 +105,47 @@ function renderDns(dns, settings) {
 
   if (!dns.running || !dns.ports.length) {
     $('dns-headline').textContent = 'Not listening';
+    setPill('dns-pill', 'fail', 'Not listening');
   } else if (dns.effective === 'standalone') {
     $('dns-headline').textContent = lan.length ? `Ready at ${lan[0]}` : 'Ready on port 53';
+    setPill('dns-pill', 'ok', 'Port 53');
   } else {
     $('dns-headline').textContent = `Ready as upstream on port ${dns.altPort}`;
+    setPill('dns-pill', 'ok', 'Upstream');
   }
 
   let message = dns.error || '';
   if (!message && settings.mode === 'auto' && dns.effective === 'upstream') {
     message = `Another app on this Umbrel uses port 53, so Dit listens on port ${dns.altPort} only. `
-      + 'Set it as the upstream of that app (see "Set up your devices").';
+      + 'Set Dit as the upstream of that app (see "Set up devices"), or remove that app and choose "DNS server for my network".';
   }
   if (message) {
-    error.textContent = message;
+    $('dns-error-text').textContent = message;
     error.hidden = false;
   }
 }
 
+// The status panel at the bottom of the sidebar, and its short form in the phone header
+function renderChrome(state, title, detail) {
+  const dot = el('span', undefined, `dot ${state}`);
+  const text = el('span');
+  text.append(el('strong', title), el('span', detail, 'detail'));
+  $('server-status').replaceChildren(dot, text);
+  $('mobile-status').replaceChildren(el('span', undefined, `dot ${state}`), document.createTextNode(title));
+}
+
 function renderOverall(status) {
-  const pill = $('overall');
-  const listening = status.dns && status.dns.running && status.dns.ports.length > 0;
+  const dns = status.dns;
+  const listening = dns && dns.running && dns.ports.length > 0;
+  const where = listening ? `port${dns.ports.length > 1 ? 's' : ''} ${dns.ports.join(' and ')}` : '';
   if (status.hnsd.synced && listening) {
-    pill.dataset.state = 'ok';
-    pill.textContent = 'Resolving';
+    renderChrome('ok', 'Resolving', `hnsd synced · ${where}`);
   } else if (!status.hnsd.running && !status.hnsd.reachable) {
-    pill.dataset.state = 'fail';
-    pill.textContent = 'Stopped';
+    renderChrome('fail', 'Stopped', 'hnsd is not running');
+  } else if (status.hnsd.synced && !listening) {
+    renderChrome('fail', 'Not listening', 'The DNS service has no port');
   } else {
-    pill.dataset.state = 'wait';
-    pill.textContent = status.hnsd.reachable && !status.hnsd.synced ? 'Syncing' : 'Starting…';
+    renderChrome('warn', status.hnsd.reachable ? 'Syncing' : 'Starting…', 'Handshake names resolve once synced');
   }
 }
 
@@ -137,8 +161,7 @@ async function refresh() {
       if (radio) radio.checked = true;
     }
   } catch (e) {
-    $('overall').dataset.state = 'fail';
-    $('overall').textContent = 'Not reachable';
+    renderChrome('fail', 'Not reachable', 'Dit did not answer');
   }
 }
 
@@ -158,7 +181,7 @@ function renderLookup(result) {
     const reason = result.rcode === 'NXDOMAIN' ? 'This name does not exist.'
       : result.rcode === 'SERVFAIL' ? 'The resolver could not get a valid answer. If hnsd is still syncing, try again when it is done.'
       : `No ${result.type} records for ${result.name}.`;
-    box.append(el('p', reason, 'note'));
+    box.append(el('p', reason, 'note inline'));
     return;
   }
 
@@ -184,7 +207,7 @@ $('lookup-form').addEventListener('submit', async event => {
   try {
     renderLookup(await api('lookup', {name: $('lookup-name').value, type: $('lookup-type').value}));
   } catch (e) {
-    $('lookup-result').replaceChildren(el('p', e.message, 'note fail'));
+    $('lookup-result').replaceChildren(el('p', e.message, 'note inline fail'));
   } finally {
     button.disabled = false;
     button.textContent = 'Look up';
@@ -204,11 +227,11 @@ $('mode-form').addEventListener('submit', async event => {
   try {
     await api('settings', {mode: chosen.value});
     modeTouched = false;
-    saved.className = 'note';
+    saved.className = 'note inline';
     saved.textContent = 'Saved. The DNS service switches within a few seconds.';
     setTimeout(refresh, 4000);
   } catch (e) {
-    saved.className = 'note fail';
+    saved.className = 'note inline fail';
     saved.textContent = e.message;
   } finally {
     $('mode-button').disabled = false;
@@ -226,10 +249,90 @@ async function loadLog() {
   }
 }
 
-$('log-details').addEventListener('toggle', event => {
-  if (event.target.open) loadLog();
+// ---------- pages ----------
+
+const PAGES = ['overview', 'setup', 'mode', 'log'];
+let currentPage = null;
+
+function route() {
+  const name = (location.hash || '#/').replace(/^#\/?/, '') || 'overview';
+  const page = PAGES.includes(name) ? name : 'overview';
+  for (const section of document.querySelectorAll('[data-page]')) section.hidden = section.dataset.page !== page;
+  for (const link of document.querySelectorAll('[data-nav]')) {
+    if (link.dataset.nav === page) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+  closeMenu();
+  if (page !== currentPage) {
+    currentPage = page;
+    window.scrollTo(0, 0);
+    $('app').focus({preventScroll: true});
+    if (page === 'log') loadLog();
+  }
+}
+
+// ---------- menu (phones) ----------
+
+const menuButton = $('menu-button');
+const side = $('side');
+
+function closeMenu() {
+  side.classList.remove('open');
+  menuButton.setAttribute('aria-expanded', 'false');
+  menuButton.setAttribute('aria-label', 'Open menu');
+}
+
+menuButton.addEventListener('click', () => {
+  const open = !side.classList.contains('open');
+  side.classList.toggle('open', open);
+  menuButton.setAttribute('aria-expanded', String(open));
+  menuButton.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
 });
 
+// ---------- light and dark theme ----------
+// theme.js applies the theme before the page draws; this button switches it
+// and remembers the choice in this browser.
+
+const THEME_ICONS = {
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+};
+const themeToggle = $('theme-toggle');
+
+function showTheme() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  // Fixed markup only: the icons are constants above
+  themeToggle.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${THEME_ICONS[dark ? 'sun' : 'moon']}</svg>`;
+  themeToggle.append(dark ? 'Light mode' : 'Dark mode');
+}
+
+themeToggle.addEventListener('click', () => {
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = theme;
+  try {
+    localStorage.setItem('dit-theme', theme);
+  } catch (e) {
+    // private window or blocked storage: the choice lasts until the page closes
+  }
+  showTheme();
+});
+
+// No saved choice: follow the system when it switches (for example at sunset)
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+    let saved = null;
+    try { saved = localStorage.getItem('dit-theme'); } catch (e) {}
+    if (saved) return;
+    document.documentElement.dataset.theme = event.matches ? 'dark' : 'light';
+    showTheme();
+  });
+}
+
+// ---------- start ----------
+
+showTheme();
+window.addEventListener('hashchange', route);
+route();
 refresh();
 setInterval(refresh, 5000);
-setInterval(() => { if ($('log-details').open) loadLog(); }, 5000);
+setInterval(() => { if (currentPage === 'log') loadLog(); }, 5000);

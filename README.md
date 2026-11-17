@@ -9,7 +9,7 @@ device, and no public resolver to trust.
 *Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
 brings to the whole network.
 
-> **Status: v0.1.1, early.** The image builds for amd64 and arm64 and the app
+> **Status: v0.1.2, early.** The image builds for amd64 and arm64 and the app
 > runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
 ## What it does
@@ -166,7 +166,7 @@ Tested on an Umbrel (Raspberry Pi, v0.1.0):
 
 Not tested yet:
 
-- The hnsd patch on a real Umbrel (v0.1.1).
+- The hnsd patch on a real Umbrel (since v0.1.1).
 - Android over Wi-Fi and Tailscale, AdGuard Home in front of Dit.
 - hnsd serving a whole network for days.
 
