@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.1.2
+## State: v0.1.3
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -53,11 +53,19 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
 1. ~~Move `build-image.yml` from the repo root to `.github/workflows/`.~~ Done.
 2. ~~Push as `galetaire/dit`; build the image; make the ghcr package public.~~ Done.
 3. ~~Install from the community store on the Umbrel; watch the first sync.~~
-   Done; then update to 0.1.2 and confirm Handshake names resolve.
+   Done. 0.1.2 installed 17 Nov 2026: Handshake names resolve on port 53
+   (woodburn, nathan.woodburn, nb, c, AD flag set) and keep resolving after
+   lookups of missing names, so the aggressive-NSEC patch works.
 4. ~~Check port 53.~~ Pi-hole was installed and held it; user removed it.
-   Note: "Automatic" remembers its first decision, so after removing a DNS
-   app the user must pick "DNS server for my network" explicitly.
-5. Test Android: Wi-Fi DNS pointed at the Umbrel, then Tailscale DNS.
+   That showed "Automatic" never re-checked port 53. Fixed in 0.1.3: the runner probes port 53 every 30 s while on 5300 only;
+   standalone takes it when free, auto only sets `mainPortFree` and the
+   Overview page offers "Use port 53" (re-saves auto, which now forgets
+   the remembered decision). Auto never takes it alone: Pi-hole may only be
+   restarting. Simulated locally with a fake dnsproxy; not run on the Umbrel.
+5. Test Android: ~~Wi-Fi DNS pointed at the Umbrel~~ (works on PC and
+   phone, router DNS = Umbrel, 17 Nov 2026). Tailscale DNS: dropped, the
+   owner doesn't use Tailscale. The setup guide stays in the app for other
+   users, untested.
 6. ~~Add a LICENSE~~ (MIT, done) and gallery screenshots (`gallery: []` in
    the manifest).
 

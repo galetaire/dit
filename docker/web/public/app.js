@@ -114,8 +114,11 @@ function renderDns(dns, settings) {
     setPill('dns-pill', 'ok', 'Upstream');
   }
 
+  const portFree = settings.mode === 'auto' && dns.effective === 'upstream' && !!dns.mainPortFree;
+  $('port-free').hidden = !portFree;
+
   let message = dns.error || '';
-  if (!message && settings.mode === 'auto' && dns.effective === 'upstream') {
+  if (!message && !portFree && settings.mode === 'auto' && dns.effective === 'upstream') {
     message = `Another app on this Umbrel uses port 53, so Dit listens on port ${dns.altPort} only. `
       + 'Set Dit as the upstream of that app (see "Set up devices"), or remove that app and choose "DNS server for my network".';
   }
@@ -235,6 +238,25 @@ $('mode-form').addEventListener('submit', async event => {
     saved.textContent = e.message;
   } finally {
     $('mode-button').disabled = false;
+  }
+});
+
+// Saving "Automatic" again makes the DNS service decide again, starting with port 53
+$('port-free-button').addEventListener('click', async () => {
+  const button = $('port-free-button');
+  button.disabled = true;
+  button.textContent = 'Switching…';
+  try {
+    await api('settings', {mode: 'auto'});
+    setTimeout(refresh, 4000);
+  } catch (e) {
+    $('dns-error-text').textContent = e.message;
+    $('dns-error').hidden = false;
+  } finally {
+    setTimeout(() => {
+      button.disabled = false;
+      button.textContent = 'Use port 53';
+    }, 4000);
   }
 });
 

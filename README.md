@@ -9,7 +9,7 @@ device, and no public resolver to trust.
 *Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
 brings to the whole network.
 
-> **Status: v0.1.2, early.** The image builds for amd64 and arm64 and the app
+> **Status: v0.1.3, early.** The image builds for amd64 and arm64 and the app
 > runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
 ## What it does
@@ -60,11 +60,12 @@ Both services use the same image and share the data folder:
 
 | Mode | Ports | Notes |
 |---|---|---|
-| Automatic (default) | 53 + 5300 if port 53 is free, else 5300 | Decided on first start and remembered, so it does not depend on which app starts first after a reboot |
-| DNS server for my network | 53 + 5300 | If another app holds port 53, Dit listens on 5300 only and shows a warning |
-| Upstream | 5300 | For `127.0.0.1#5300` in Pi-hole or `127.0.0.1:5300` in AdGuard Home |
+| Automatic (default) | 53 + 5300 if port 53 is free, else 5300 | Decided on first start and remembered, so it does not depend on which app starts first after a reboot. If port 53 frees up later, the page offers it ("Use port 53") but Dit never takes it by itself: the other DNS app may only be restarting |
+| DNS server for my network | 53 + 5300 | If another app holds port 53, Dit listens on 5300 only, shows a warning, and takes port 53 as soon as it is free (checked every 30 s) |
+| Upstream | 5300 | For `127.0.0.1#5300` in Pi-hole or `127.0.0.1:5300` in AdGuard Home. Port 53 is never checked |
 
-Saving a mode again makes the runner retry port 53.
+Saving a mode again makes the runner retry port 53. Saving Automatic again also
+forgets its remembered decision.
 
 ## Install on umbrelOS
 

@@ -4,7 +4,7 @@ name: Dit
 tagline: Resolve Handshake names on your whole home network
 icon: https://raw.githubusercontent.com/galetaire/dit/main/dit-resolver/dit.png
 category: networking
-version: "0.1.2"
+version: "0.1.3"
 port: 4748
 description: >-
   Dit is a DNS resolver for Handshake (HNS) names that runs on your own
@@ -35,10 +35,9 @@ repo: https://github.com/galetaire/dit
 support: https://github.com/galetaire/dit/issues
 gallery: []
 releaseNotes: >-
-  New design in the style of Castell, with a sidebar, separate pages for
-  setup, listening mode and the log, and a light and dark mode switch.
-  Also includes the 0.1.1 fix: after any lookup of a name that does not
-  exist, every Handshake name could fail for up to 24 hours.
+  When the app that had port 53 (Pi-hole, AdGuard Home) is removed, Dit
+  notices: in "DNS server for my network" mode it takes the port by itself,
+  in Automatic mode the Overview page offers it with a "Use port 53" button.
 dependencies: []
 path: ""
 defaultUsername: ""

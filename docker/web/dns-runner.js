@@ -9,10 +9,18 @@
 //               and use Dit as their upstream resolver.
 // - auto:       standalone if port 53 is free the first time, else upstream.
 //               The decision is remembered, so it does not depend on which app
-//               starts first after a reboot.
+//               starts first after a reboot. Saving "auto" again from the web UI
+//               forgets it and tries port 53 first.
+//
+// While only the alternate port is in use, port 53 is checked every 30s:
+// standalone mode takes it as soon as it is free (that is what was asked for);
+// auto mode only reports it (mainPortFree), so the web UI can offer it. Auto
+// never takes it by itself: the other DNS app may just be restarting.
 //
 // It writes dns-state.json for the web UI: ports, errors and the Umbrel's addresses.
 const {spawn} = require('child_process');
+const dgram = require('dgram');
+const net = require('net');
 const os = require('os');
 const state = require('./lib/state');
 
@@ -22,6 +30,7 @@ const MAIN_PORT = Number(process.env.DIT_MAIN_PORT || 53);
 const ALT_PORT = Number(process.env.DIT_ALT_PORT || 5300);
 const CACHE_BYTES = Number(process.env.DIT_CACHE_BYTES || 8 * 1024 * 1024);
 const POLL_MS = 2000;
+const PROBE_MS = Number(process.env.DIT_PROBE_MS || 30000);
 // dnsproxy binds its ports right away: alive after this long means they are ours
 const SETTLE_MS = 2500;
 
@@ -36,6 +45,8 @@ let current = {
   effective: null,
   ports: [],
   mainPortBusy: false,
+  // Auto mode on the alternate port only, and port 53 has become free
+  mainPortFree: false,
   error: null,
 };
 
@@ -155,11 +166,14 @@ async function apply(force = false) {
     // Unchanged settings: nothing to do. Crashes and failed starts are retried
     // by their own timers (force), not by this poll.
     if (!force && wanted === wantedMode) return;
+    // Settings saved from the web UI since this runner started (not a restart):
+    // saving "auto" again means "decide again", so try port 53 first
+    if (wantedMode !== null && wanted !== wantedMode && mode === 'auto') current.autoDecision = null;
     wantedMode = wanted;
     await stopProxy();
 
     let effective = mode === 'auto' ? (current.autoDecision || 'standalone') : mode;
-    current = {...current, mode, error: null, mainPortBusy: false};
+    current = {...current, mode, error: null, mainPortBusy: false, mainPortFree: false};
 
     for (let attempt = 0; attempt < 4; attempt++) {
       const ports = effective === 'standalone' ? [MAIN_PORT, ALT_PORT] : [ALT_PORT];
@@ -213,6 +227,51 @@ async function apply(force = false) {
   }
 }
 
+// Can port 53 be bound right now (UDP and TCP, all IPv4 interfaces)?
+// Binds for an instant and releases it.
+function portIsFree(port) {
+  const udp = new Promise(resolve => {
+    const socket = dgram.createSocket('udp4');
+    socket.once('error', () => { socket.close(); resolve(false); });
+    socket.bind(port, '0.0.0.0', () => socket.close(() => resolve(true)));
+  });
+  const tcp = new Promise(resolve => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.listen(port, '0.0.0.0', () => server.close(() => resolve(true)));
+  });
+  return Promise.all([udp, tcp]).then(([a, b]) => a && b);
+}
+
+let probing = false;
+
+async function probeMainPort() {
+  // Only when listening on the alternate port alone, in a mode that wants port 53
+  const onAltOnly = child && current.ports.length === 1 && current.ports[0] === ALT_PORT;
+  if (stopping || applying || probing || !onAltOnly || current.mode === 'upstream') {
+    if (current.mainPortFree && !onAltOnly) current.mainPortFree = false;
+    return;
+  }
+  probing = true;
+  try {
+    const free = await portIsFree(MAIN_PORT);
+    if (current.mode === 'standalone') {
+      if (free) {
+        log(`port ${MAIN_PORT} is free again, taking it`);
+        await apply(true);
+      }
+    } else if (free !== current.mainPortFree) {
+      current.mainPortFree = free;
+      log(free ? `port ${MAIN_PORT} is free; choose it from the web page to use it` : `port ${MAIN_PORT} is in use again`);
+      writeState();
+    }
+  } catch (e) {
+    log(`could not check port ${MAIN_PORT}: ${e.message}`);
+  } finally {
+    probing = false;
+  }
+}
+
 async function shutdown() {
   if (stopping) return;
   stopping = true;
@@ -229,3 +288,4 @@ apply(true);
 // Pick up mode changes made in the web UI, and keep the state file fresh
 setInterval(() => { if (!stopping) apply(); }, POLL_MS);
 setInterval(() => { if (!stopping && !applying) writeState(); }, 10000);
+setInterval(probeMainPort, PROBE_MS);
