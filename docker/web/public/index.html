@@ -250,10 +250,11 @@
         <form class="card stack" id="redirect-form">
           <div>
             <div class="card-head">
-              <h2>Without proxy settings <span class="badge small">Beta</span></h2>
+              <h2>Without proxy settings, for phones <span class="badge small">Beta</span></h2>
               <span class="pill idle" id="redirect-pill">Off</span>
             </div>
-            <p class="lead">Devices that use Dit as their DNS server open DANE sites without the auto-config proxy: only the certificate is needed. Dit answers those names with an extra address of its own on your network, because umbrelOS already uses port 443 on the Umbrel's address.</p>
+            <p class="lead">Phones that use Dit as their DNS server open DANE sites without the auto-config proxy: only the certificate is needed. Dit answers those names with an extra address of its own on your network, because umbrelOS already uses port 443 on the Umbrel's address.</p>
+            <p class="note"><strong>On computers, keep the auto-config proxy.</strong> Windows never looks up single-word names like <code>mysite/</code>, and desktop browsers often use their own "secure DNS" that skips Dit. With the proxy, every browser works.</p>
           </div>
           <div class="grid-fields">
             <label>
@@ -271,7 +272,7 @@
             <button type="submit" class="primary" id="redirect-button">Save</button>
             <span class="note inline" id="redirect-saved" aria-live="polite"></span>
           </div>
-          <p class="note">When it is on, devices can drop the auto-config proxy setting. Devices that keep it still work, and Windows needs it for single-word names (see Windows below). Turning it off removes the extra address again.</p>
+          <p class="note">When it is on, phones can drop the auto-config proxy setting; devices that keep it still work. Tested with Chrome and Firefox on Android; Firefox needs "Use third party CA certificates" switched on first (see Firefox below). Turning it off removes the extra address again.</p>
         </form>
 
         <div class="columns">
@@ -295,7 +296,7 @@
                 <li>Settings → Network &amp; internet → Proxy → <strong>Use setup script</strong> → Set up, and enter <code class="dane-pac">http://your-umbrel:9053/proxy.pac</code> as the script address. Save.</li>
                 <li>Restart the browser.</li>
               </ol>
-              <p class="note"><strong>Keep the setup script on Windows</strong>, even with "Without proxy settings" on: Windows never looks up single-word names like <code>mysite/</code>, so without the script only names with a dot (<code>www.mysite/</code>) open. The script sends every Handshake name to Dit's proxy, which looks it up itself.</p>
+              <p class="note"><strong>Always keep the setup script on Windows</strong>, also with "Without proxy settings" on. Without it, single-word names like <code>mysite/</code> never open (Windows doesn't look them up), and browsers with their own "secure DNS" (Brave by default, Chrome or Edge if set to a provider) skip Dit for every Handshake name. With the script, Chrome, Edge, Brave and Firefox all work.</p>
             </article>
 
             <article class="card">
@@ -303,7 +304,7 @@
               <p class="lead">Firefox has its own DNS and its own certificate store, so it needs two settings Chrome doesn't.</p>
               <ol class="steps">
                 <li>Turn <strong>DNS over HTTPS</strong> off. Otherwise Firefox asks a public resolver, which doesn't know Handshake names ("We're having trouble finding that site"). Android: Settings → Privacy and security → DNS over HTTPS → Off. Windows: Settings → Privacy &amp; Security → DNS over HTTPS → Off.</li>
-                <li>Trust Dit's certificate. Android: install it in Android as above, then Settings → About Firefox → tap the Firefox logo 5 times → back in Settings, Secret Settings → <strong>Use third party CA certificates</strong>. Windows: Settings → Privacy &amp; Security → Certificates → View Certificates → Authorities → <strong>Import</strong>, and tick "Trust this CA to identify websites".</li>
+                <li>Trust Dit's certificate. Android: install it in Android as above, then Settings → About Firefox → tap the Firefox logo 5 times → back in Settings, Secret Settings → <strong>Use third party CA certificates</strong>. Without it, Firefox opens Handshake sites but not over a trusted HTTPS connection. Windows: Settings → Privacy &amp; Security → Certificates → View Certificates → Authorities → <strong>Import</strong>, and tick "Trust this CA to identify websites".</li>
                 <li>For the proxy, Windows: Settings → Network Settings → <strong>Automatic proxy configuration URL</strong>, with the address above. Android: Firefox uses the Wi-Fi proxy setting.</li>
               </ol>
             </article>

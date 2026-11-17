@@ -4,7 +4,7 @@ name: Dit
 tagline: Resolve Handshake names on your whole home network
 icon: https://raw.githubusercontent.com/galetaire/dit/main/dit-resolver/dit.png
 category: networking
-version: "0.3.1"
+version: "0.3.2"
 port: 4748
 description: >-
   Dit is a DNS resolver for Handshake (HNS) names that runs on your own
@@ -37,10 +37,9 @@ repo: https://github.com/galetaire/dit
 support: https://github.com/galetaire/dit/issues
 gallery: []
 releaseNotes: >-
-  Clearer setup on the Secure sites page: on Windows, keep the setup script
-  so single-word Handshake names open too (Windows never looks them up
-  itself), and a new Firefox section (turn off DNS over HTTPS, trust Dit's
-  certificate).
+  "Without proxy settings" is now presented as a phone feature (tested with
+  Chrome and Firefox on Android); on computers, keep the auto-config proxy,
+  which works in every browser. Clearer Firefox steps.
 dependencies: []
 path: ""
 defaultUsername: ""

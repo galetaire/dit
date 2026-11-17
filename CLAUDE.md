@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.3.1
+## State: v0.3.2
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -114,7 +114,15 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
   wlan0, net-state active): DANE names answer .200, AAAA empty, others
   unchanged; HTTPS to .200 with no proxy: nathan.woodburn and hnsdoh 200;
   http -> 301 https; umbrelOS's own 443 on .27 untouched. Phone without the
-  proxy setting: not yet tested. Windows PC (headless Chrome, user's CA in
+  proxy setting (user, 17 Nov 2026): Chrome on Android opens belikebill/ and
+  just.belikebill/ as secure; Firefox on Android resolves them but doesn't
+  trust the CA until "Use third party CA certificates" (secret settings) is
+  on; with it, both open as secure (confirmed by the user). Desktop (user):
+  Firefox, Chrome and Brave on Windows all need the PAC; positioning since
+  then: "Without proxy settings" is for phones, computers keep the PAC.
+  (Headless fresh-profile Chrome does open dotted names without PAC, e.g.
+  just.belikebill; everyday browsers likely use their own secure DNS.)
+  Windows PC (headless Chrome, user's CA in
   CurrentUser\Root): nathan.woodburn loads with no proxy; single-word names
   (hnsdoh, woodburn) give ERR_NAME_NOT_RESOLVED because Windows never sends
   single-label names to DNS; with the PAC script set they load. Trailing dot
