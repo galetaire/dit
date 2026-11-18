@@ -247,33 +247,6 @@
           </article>
         </div>
 
-        <form class="card stack" id="redirect-form">
-          <div>
-            <div class="card-head">
-              <h2>Without proxy settings, for phones <span class="badge small">Beta</span></h2>
-              <span class="pill idle" id="redirect-pill">Off</span>
-            </div>
-            <p class="lead">Phones that use Dit as their DNS server open DANE sites without the auto-config proxy: only the certificate is needed. Dit answers those names with an extra address of its own on your network, because umbrelOS already uses port 443 on the Umbrel's address.</p>
-            <p class="note"><strong>On computers, keep the auto-config proxy.</strong> Windows never looks up single-word names like <code>mysite/</code>, and desktop browsers often use their own "secure DNS" that skips Dit. With the proxy, every browser works.</p>
-          </div>
-          <div class="grid-fields">
-            <label>
-              <span class="field-label">Extra address for Dit</span>
-              <span class="hint">A free address outside your router's DHCP range (the range it hands out to devices). Nothing else may use it.</span>
-              <input type="text" id="redirect-ip" placeholder="for example 192.168.1.200" autocomplete="off" spellcheck="false" inputmode="decimal">
-            </label>
-            <label class="check-label">
-              <input type="checkbox" id="redirect-enabled">
-              Use DANE without proxy settings
-            </label>
-          </div>
-          <p class="note fail" id="redirect-error" hidden></p>
-          <div class="actions end">
-            <button type="submit" class="primary" id="redirect-button">Save</button>
-            <span class="note inline" id="redirect-saved" aria-live="polite"></span>
-          </div>
-          <p class="note">When it is on, phones can drop the auto-config proxy setting; devices that keep it still work. Tested with Chrome and Firefox on Android; Firefox needs "Use third party CA certificates" switched on first (see Firefox below). Turning it off removes the extra address again.</p>
-        </form>
 
         <div class="columns">
           <div class="col-main">
@@ -283,7 +256,7 @@
               <ol class="steps">
                 <li>On the phone, open <code class="dane-ca-text">http://your-umbrel:9053/dit-dane.crt</code> in Chrome to download the certificate.</li>
                 <li>Settings → Security &amp; privacy → More security settings → Encryption &amp; credentials → <strong>Install a certificate</strong> → <strong>CA certificate</strong> → Install anyway, and pick <code>dit-dane.crt</code>.</li>
-                <li>Settings → Network &amp; internet → Internet → your Wi-Fi → edit → Advanced → <strong>Proxy: Auto-config</strong>, and enter <code class="dane-pac">http://your-umbrel:9053/proxy.pac</code> as the PAC URL. Save. Skip this step when "Without proxy settings" above is on.</li>
+                <li>Settings → Network &amp; internet → Internet → your Wi-Fi → edit → Advanced → <strong>Proxy: Auto-config</strong>, and enter <code class="dane-pac">http://your-umbrel:9053/proxy.pac</code> as the PAC URL. Save.</li>
                 <li>Open a Handshake site that uses DANE, for example <code>nathan.woodburn/</code>. It loads without a certificate warning.</li>
               </ol>
               <p class="note">Chrome trusts the certificate; most other Android apps ignore certificates you install yourself. The proxy setting only applies on that Wi-Fi network. Menu names differ a little between phone brands.</p>
@@ -296,7 +269,7 @@
                 <li>Settings → Network &amp; internet → Proxy → <strong>Use setup script</strong> → Set up, and enter <code class="dane-pac">http://your-umbrel:9053/proxy.pac</code> as the script address. Save.</li>
                 <li>Restart the browser.</li>
               </ol>
-              <p class="note"><strong>Always keep the setup script on Windows</strong>, also with "Without proxy settings" on. Without it, single-word names like <code>mysite/</code> never open (Windows doesn't look them up), and browsers with their own "secure DNS" (Brave by default, Chrome or Edge if set to a provider) skip Dit for every Handshake name. With the script, Chrome, Edge, Brave and Firefox all work.</p>
+              <p class="note"><strong>Keep the setup script on Windows.</strong> Without it, single-word names like <code>mysite/</code> never open (Windows doesn't look them up), and browsers with their own "secure DNS" (Brave by default, Chrome or Edge if set to a provider) skip Dit for every Handshake name. With the script, Chrome, Edge, Brave and Firefox all work.</p>
             </article>
 
             <article class="card">

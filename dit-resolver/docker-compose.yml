@@ -10,7 +10,7 @@ services:
   # Web UI + hnsd (the Handshake light client and its recursive resolver).
   # They share a container because hnsd only answers status queries from localhost.
   server:
-    image: ghcr.io/galetaire/dit:0.3.2
+    image: ghcr.io/galetaire/dit:0.4.0
     restart: on-failure
     stop_grace_period: 30s
     environment:
@@ -32,7 +32,7 @@ services:
   # network's DNS server, or only 5300 when Pi-hole/AdGuard Home (which also use
   # host networking and port 53 on Umbrel) are in front of it.
   dns:
-    image: ghcr.io/galetaire/dit:0.3.2
+    image: ghcr.io/galetaire/dit:0.4.0
     restart: on-failure
     network_mode: host
     # Root with just enough to bind port 53 and write its state file
@@ -47,9 +47,6 @@ services:
     environment:
       - TZ=Etc/UTC
       - DIT_UPSTREAM=127.0.0.1:15350
-      # DANE without proxy settings: the dane service's DNS rewriter, used as
-      # the upstream while that feature is on (DIT_UPSTREAM stays the fallback)
-      - DIT_REWRITER=127.0.0.1:15351
       # The port Dit always listens on, for Pi-hole/AdGuard Home upstreams
       - DIT_ALT_PORT=5300
     volumes:
@@ -60,11 +57,8 @@ services:
   # that each device installs once. Also serves the PAC file and the CA
   # certificate to devices. Host networking so devices on the LAN reach it and
   # it reaches hnsd on the Umbrel's loopback (port 15350).
-  # Also runs DANE without proxy settings: the DNS rewriter (127.0.0.1:15351)
-  # and the fronts that the net service's firewall rules send traffic to
-  # (TLS 9443, HTTP 9080).
   dane:
-    image: ghcr.io/galetaire/dit:0.3.2
+    image: ghcr.io/galetaire/dit:0.4.0
     restart: on-failure
     network_mode: host
     # Same owner as the app data; port 9053 needs no privileges
@@ -76,40 +70,8 @@ services:
     environment:
       - TZ=Etc/UTC
       - DIT_DANE_PORT=9053
-      # hnsd directly, never the rewriter: the proxy must see the real addresses
+      # hnsd directly (validates DNSSEC and sets the AD flag the proxy trusts)
       - DIT_DANE_RESOLVER=127.0.0.1:15350
-      - DIT_REWRITE_LISTEN=127.0.0.1:15351
-      - DIT_REWRITE_UPSTREAM=127.0.0.1:15350
-      - DIT_REDIRECT_TLS_PORT=9443
-      - DIT_REDIRECT_HTTP_PORT=9080
     volumes:
       - ${APP_DATA_DIR}/data:/data
 
-  # Network helper for DANE without proxy settings ("dit-dane net"). Does
-  # nothing until that feature is switched on in Dit's page; then it adds the
-  # chosen extra address to the Umbrel's network interface and two firewall
-  # rules sending that address's ports 443 and 80 to the dane service. It
-  # removes them when the feature is switched off or the app stops.
-  # umbrelOS keeps port 443 of the Umbrel's own address for its own HTTPS.
-  net:
-    image: ghcr.io/galetaire/dit:0.3.2
-    restart: on-failure
-    network_mode: host
-    stop_grace_period: 15s
-    # Root with only what changing addresses and firewall rules needs, plus
-    # writing its state file in the app data folder (owned by uid 1000)
-    user: "0:0"
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-      - DAC_OVERRIDE
-    entrypoint: ["/sbin/tini", "--"]
-    command: ["/usr/local/bin/dit-dane", "net"]
-    environment:
-      - TZ=Etc/UTC
-      - DIT_REDIRECT_TLS_PORT=9443
-      - DIT_REDIRECT_HTTP_PORT=9080
-    volumes:
-      - ${APP_DATA_DIR}/data:/data

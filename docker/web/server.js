@@ -45,8 +45,6 @@ async function getStatus() {
   const fresh = !!dns && Date.now() - Date.parse(dns.updatedAt) < DNS_STATE_MAX_AGE;
   const dane = state.loadDaneState();
   const daneFresh = !!dane && Date.now() - Date.parse(dane.updatedAt) < DNS_STATE_MAX_AGE;
-  const netState = state.loadNetState();
-  const netFresh = !!netState && Date.now() - Date.parse(netState.updatedAt) < DNS_STATE_MAX_AGE;
   return {
     version: require('./package.json').version,
     settings: state.loadSettings(),
@@ -55,9 +53,6 @@ async function getStatus() {
     dns: fresh ? dns : null,
     // null: the DANE proxy has not reported (yet), or stopped reporting
     dane: daneFresh ? dane : null,
-    // DANE without proxy settings: the extra address the net service set up.
-    // null: the net service has not reported (yet), or stopped reporting
-    net: netFresh ? netState : null,
   };
 }
 
@@ -78,26 +73,6 @@ async function lookup(body) {
 function saveSettings(body) {
   if (!state.MODES.includes(body.mode)) throw new UserError('Unknown mode.');
   const settings = {...state.loadSettings(), mode: body.mode, savedAt: new Date().toISOString()};
-  state.saveSettings(settings);
-  return settings;
-}
-
-// DANE without proxy settings: on/off and the extra LAN address it uses.
-// Kept apart from the mode's savedAt, so it never resets Automatic's decision.
-function saveRedirect(body) {
-  const enabled = body.enabled === true;
-  const ip = String(body.ip || '').trim();
-  if (enabled || ip) {
-    if (!state.validRedirectIp(ip)) {
-      throw new UserError('Use a private IPv4 address on your network, like 192.168.1.200.');
-    }
-    const dns = state.loadDnsState();
-    const own = dns && Array.isArray(dns.addresses) ? dns.addresses.map(a => a.address) : [];
-    if (own.includes(ip)) {
-      throw new UserError(`${ip} is the Umbrel's own address. Choose a free one, outside your router's DHCP range.`);
-    }
-  }
-  const settings = {...state.loadSettings(), redirect: {enabled, ip, savedAt: new Date().toISOString()}};
   state.saveSettings(settings);
   return settings;
 }
@@ -181,7 +156,6 @@ async function handle(req, res) {
       const body = await readJson(req);
       if (pathname === '/api/lookup') return sendJson(res, 200, await lookup(body));
       if (pathname === '/api/settings') return sendJson(res, 200, saveSettings(body));
-      if (pathname === '/api/redirect') return sendJson(res, 200, saveRedirect(body));
     }
     return sendJson(res, 404, {error: 'Not found.'});
   }

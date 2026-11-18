@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.3.2
+## State: v0.4.0
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -100,63 +100,32 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
     ContentHandler), not the Dit web UI behind app_proxy.
   - Proxy port on the host network, LAN only; same rule as port 53: never
     forward it from the router.
-- v0.3: DANE everywhere through DNS redirection (resolver answers with the
-  Umbrel's address for Handshake names with TLSA, Umbrel re-signs with the
-  local CA). Blocker to prototype: umbrelOS uses host port 443.
-  Built as 0.3.0 (17 Nov 2026, opt-in "Without proxy settings (beta)" card on
-  the Secure sites page; settings.json redirect {enabled, ip, savedAt},
-  separate from the mode's savedAt so Automatic keeps its decision). The
-  shell helper became "dit-dane net" (netsetup.go, net service, state in
-  net-state.json); rewriter + fronts always run, rewrite only while on; dns
-  runner switches upstream to the rewriter with hnsd as --fallback; the v0.2
-  proxy now resolves via hnsd 127.0.0.1:15350. E2E-tested in Docker with
-  all services. On the Umbrel (17 Nov 2026, extra address 192.168.1.200 on
-  wlan0, net-state active): DANE names answer .200, AAAA empty, others
-  unchanged; HTTPS to .200 with no proxy: nathan.woodburn and hnsdoh 200;
-  http -> 301 https; umbrelOS's own 443 on .27 untouched. Phone without the
-  proxy setting (user, 17 Nov 2026): Chrome on Android opens belikebill/ and
-  just.belikebill/ as secure; Firefox on Android resolves them but doesn't
-  trust the CA until "Use third party CA certificates" (secret settings) is
-  on; with it, both open as secure (confirmed by the user). Desktop (user):
-  Firefox, Chrome and Brave on Windows all need the PAC; positioning since
-  then: "Without proxy settings" is for phones, computers keep the PAC.
-  (Headless fresh-profile Chrome does open dotted names without PAC, e.g.
-  just.belikebill; everyday browsers likely use their own secure DNS.)
-  Windows PC (headless Chrome, user's CA in
-  CurrentUser\Root): nathan.woodburn loads with no proxy; single-word names
-  (hnsdoh, woodburn) give ERR_NAME_NOT_RESOLVED because Windows never sends
-  single-label names to DNS; with the PAC script set they load. Trailing dot
-  (hnsdoh.) resolves but letsdane closes: SNI "hnsdoh." != TLSA domain.
-  woodburn's own nginx returns 502 (site down, not Dit). The Secure sites
-  page now says to keep the PAC script on Windows and has a Firefox card
-  (DoH off, CA trust), released as 0.3.1. Prototype notes:
-  - Blocker confirmed: umbrelOS "Local HTTPS" answers 443 on every Umbrel
-    address for every SNI ("Umbrel Local HTTPS CA").
-  - Way around: a second LAN address for Dit. docker/dane/dit-net.sh (host
-    network, NET_ADMIN + NET_RAW) adds DIT_REDIRECT_IP to the interface
-    (ARP duplicate check, refuses lo) and two nat PREROUTING REDIRECT rules
-    tagged "dit-redirect": IP:443 -> 9443, IP:80 -> 9080. Removes them on
-    SIGTERM; survives kill -9 + restart without duplicates.
-  - docker/dane/redirect.go (on when DIT_REDIRECT_IP is set): DNS rewriter
-    on 127.0.0.1:15351 (A -> DIT_REDIRECT_IP, AAAA/HTTPS/SVCB -> no records
-    for names with AD-validated TLSA usage 2/3; everything else passed
-    through from DIT_REWRITE_UPSTREAM); SNI front on 9443 that hands the
-    connection to the v0.2 proxy as a CONNECT (same DANE check, same CA);
-    HTTP 9080 -> 301 https.
-  - Tested in Docker with a simulated Umbrel resolving through the real one:
-    rewrite correct (DANE names -> alias, humbly/ICANN untouched), HTTPS
-    to the alias with no proxy setting: nathan.woodburn HTTP/2 200 with the
-    Dit CA, hnsdoh 200, untrusted without the CA, ICANN SNI refused.
-  - To ship: dns service upstream 127.0.0.1:15351 with dnsproxy --fallback
-    127.0.0.1:15350 (DNS keeps working if dane dies); the v0.2 proxy must
-    resolve via hnsd directly (127.0.0.1:15350), else it would loop into the
-    alias; a privileged "net" service in compose; a UI setting to pick the
-    address (outside the DHCP range, here .200-.254) and switch it on.
-    Unknowns on the Umbrel: iptables backend, a second address on wlan0,
-    whether NET_ADMIN is acceptable for the community store (Tailscale uses
-    it).
+- v0.3 "DANE without proxy settings": built, shipped as 0.3.0-0.3.2 and
+  REMOVED in 0.4.0 (see Decisions). Kept here so it is not rebuilt blindly.
+  How it worked: a privileged "net" service added an extra LAN address
+  (192.168.1.200 on wlan0) plus nat REDIRECT rules (443 -> 9443, 80 -> 9080);
+  a DNS rewriter answered DANE names with that address; an SNI front handed
+  connections to the v0.2 proxy as CONNECT. It worked on the Umbrel and on
+  Android (Chrome; Firefox with "Use third party CA certificates").
+  Lessons that still apply:
+  - umbrelOS "Local HTTPS" answers port 443 on every Umbrel address for
+    every SNI ("Umbrel Local HTTPS CA"): Dit cannot use host port 443.
+  - Windows never sends single-word names to DNS (ERR_NAME_NOT_RESOLVED);
+    only the PAC proxy makes them work on Windows.
+  - Desktop browsers often use their own secure DNS (Brave by default), which
+    skips Dit; the PAC proxy works regardless.
+  - Firefox on Android needs "Use third party CA certificates" (secret
+    settings) to trust Dit's CA; Firefox needs DNS over HTTPS off.
+  - A trailing dot (mysite.) reaches DNS on Windows but letsdane closes the
+    connection: SNI "mysite." != TLSA domain "mysite".
 
 ## Decisions already made
+
+- DANE without proxy settings (v0.3) was removed in 0.4.0 at the owner's
+  request (18 Nov 2026): it only saved one Wi-Fi proxy setting on phones,
+  computers needed the PAC anyway, and it cost a root service with
+  NET_ADMIN, an extra LAN address, firewall rules and a DNS rewriter. The
+  auto-config proxy (v0.2) is the one way to get DANE.
 
 - SANE / stateless DANE (randomlogin/sane, htools-org/stateless-dane) was
   evaluated and rejected for this app: no fallback to plain DANE, so sites

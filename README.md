@@ -9,7 +9,7 @@ device, and no public resolver to trust.
 *Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
 brings to the whole network.
 
-> **Status: v0.3.2, early.** The image builds for amd64 and arm64 and the app
+> **Status: v0.4.0, early.** The image builds for amd64 and arm64 and the app
 > runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
 ## What it does
@@ -51,8 +51,7 @@ your browsers ──PAC──▶ dane service (dit-dane, host network) :9053
 |---|---|---|---|
 | `server` | Umbrel's Docker network | Node web server, which starts and supervises hnsd | hnsd only answers status queries from localhost, so the UI shares its container |
 | `dns` | host | Node runner, which starts and supervises dnsproxy | Pi-hole and AdGuard Home use host networking and port 53 on Umbrel; host networking lets Dit pick its ports at runtime instead of failing to start |
-| `dane` | host | dit-dane (Go, built on letsdane): DANE proxy, DNS rewriter, redirect fronts | Devices on the LAN reach the proxy directly, and it reaches hnsd on the Umbrel's loopback |
-| `net` | host, root with `NET_ADMIN`, `NET_RAW`, `DAC_OVERRIDE` | `dit-dane net` | Only for DANE without proxy settings: adds the extra address and two firewall rules while that feature is on, nothing otherwise |
+| `dane` | host | dit-dane (Go, built on letsdane): the DANE proxy | Devices on the LAN reach the proxy directly, and it reaches hnsd on the Umbrel's loopback |
 
 All services use the same image and share the data folder:
 
@@ -63,7 +62,6 @@ All services use the same image and share the data folder:
 | `data/dns-state.json` | dns runner | ports in use, errors, the Umbrel's addresses |
 | `data/dane/ca.crt`, `ca.key` | dane service | the local CA (key 0600, never leaves the Umbrel) |
 | `data/dane-state.json` | dane service | proxy port, CA fingerprint and expiry |
-| `data/net-state.json` | net service | the extra address it set up, or why it could not |
 
 ### Listening modes
 
@@ -106,37 +104,6 @@ apps ignore user-installed CAs (Chrome trusts them). New ICANN TLDs added
 after the CA was created are not in its constraints, though the PAC file of a
 newer image still sends them direct.
 
-## DANE without proxy settings (v0.3, beta)
-
-Opt-in, on the Secure sites page: devices that use Dit as their DNS server
-open DANE sites with only the certificate installed, no auto-config proxy.
-
-umbrelOS serves its own HTTPS ("Umbrel Local HTTPS CA") on port 443 of every
-address the Umbrel has, for every name, so Dit uses an **extra address** on
-the LAN, chosen on the page (outside the router's DHCP range):
-
-1. The `net` service adds that address to the interface whose subnet
-   contains it, after an ARP check that nothing else uses it, and two nat
-   `PREROUTING` rules tagged `dit-redirect`: `<address>:443` to the dane
-   service's TLS front (9443), `<address>:80` to its HTTP front (9080). It
-   re-adds rules that disappear, and removes everything when the feature is
-   switched off or the app stops. What it set up is kept in
-   `data/net-state.json`, so a crash leaves nothing behind after the next start.
-2. The `dns` service sends queries to the dane service's DNS rewriter
-   (`127.0.0.1:15351`), with hnsd as `--fallback`: if the rewriter is down,
-   DNS keeps working and DANE sites simply get their real address.
-3. The rewriter answers A questions for Handshake names with a
-   DNSSEC-validated TLSA record (usage 2 or 3) with the extra address, and
-   AAAA, HTTPS and SVCB questions for them with no records. Everything else
-   comes from hnsd unchanged. Rewritten answers never carry the AD flag.
-4. The TLS front reads the name from the browser's ClientHello and hands the
-   connection to the DANE proxy as a CONNECT, so the same DANE check and the
-   same name-constrained CA apply. ICANN names are refused. The HTTP front
-   redirects to `https://`.
-
-The DANE proxy itself always resolves through hnsd directly
-(`127.0.0.1:15350`), never through the rewriter.
-
 ## Install on umbrelOS
 
 1. Push this repository to GitHub and let the workflow build
@@ -156,10 +123,6 @@ The DANE proxy itself always resolves through hnsd directly
 - **Never forward port 53 from your router to the Umbrel.** dnsproxy has no
   client allowlist; an open resolver gets abused. ANY queries are refused.
 - hnsd's own resolver is published on the Umbrel's loopback only (15350/udp).
-- The `net` service is the only privileged part: root with `NET_ADMIN`,
-  `NET_RAW` and `DAC_OVERRIDE`, and it does nothing until DANE without proxy
-  settings is switched on. Its rules are tagged `dit-redirect` and only match
-  the chosen extra address.
 - **Never forward port 9053 either.** The DANE proxy refuses clients outside
   private, loopback and Tailscale ranges, but it is meant for your LAN. Its
   CA key stays in `data/dane/` (0600); the CA cannot sign ICANN names.
@@ -182,15 +145,10 @@ not merged. See `docker/Dockerfile`.
   a publicly trusted certificate, so remote use goes through Tailscale.
 - dnsproxy talks to hnsd over UDP only (hnsd has no TCP listener). hnsd
   accepts answers up to 4096 bytes, which covers normal use.
-- Ports 53, 5300, 9053, 9443, 9080, 15350 and 15351 are fixed in
-  `docker-compose.yml`.
-- DANE without proxy settings uses IPv4 only (AAAA answers for DANE names
-  are empty) and needs a free address in the Umbrel's own subnet.
+- Ports 53, 5300, 9053 and 15350 are fixed in `docker-compose.yml`.
 - Windows never sends single-word names (`mysite`) to DNS
-  (`ERR_NAME_NOT_RESOLVED` in Chrome), so without the PAC file only names
-  with a dot open there. With the PAC file the proxy resolves them itself.
-  A trailing dot (`mysite.`) does reach DNS, but the DANE check then sees
-  `mysite.` as a different name and closes the connection.
+  (`ERR_NAME_NOT_RESOLVED` in Chrome); with the PAC file the proxy resolves
+  them itself, so keep it set on Windows.
 - Firefox needs DNS over HTTPS off and Dit's CA in its own store (or, on
   Android, "Use third party CA certificates" in its secret settings).
 - No gallery screenshots yet (`gallery: []` in the manifest).
@@ -272,20 +230,11 @@ On the Umbrel (v0.2.0): the DANE proxy serves the PAC file and CA,
 `nathan.woodburn` and `hnsdoh` load through it; an Android phone with
 Chrome opens DANE sites with the CA and the auto-config proxy.
 
-DANE without proxy settings (v0.3, locally, in Docker: dns runner +
-dnsproxy, dane and net services together, resolving through the Umbrel):
-switched on and off through settings.json as the page saves it (address and
-rules added and removed); DANE names answer the extra address, others are
-unchanged; HTTPS to the extra address with no proxy setting returns 200 with
-the Dit CA; an address another device uses is refused with a message; with
-the rewriter killed, new names still resolve through the fallback; the
-helper cleans up on SIGTERM and recovers after kill -9. Go tests cover the
-rewriter against a fake hnsd; Node tests the address validation.
+Firefox on Android opens DANE sites through the proxy once "Use third party
+CA certificates" is on; Chrome, Brave and Firefox on Windows with the PAC.
 
 Not tested yet:
 
-- DANE without proxy settings on a real Umbrel (a second address on wlan0,
-  umbrelOS's firewall backend) and on a phone.
 - AdGuard Home in front of Dit; Tailscale (not used by the maintainer).
 - hnsd serving a whole network for days.
 

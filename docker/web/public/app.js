@@ -151,66 +151,6 @@ function renderDane(dane, dns) {
   $('dane-fingerprint').textContent = dane.caFingerprint;
 }
 
-// DANE without proxy settings: the form follows the saved settings until the
-// user edits it; the pill shows what the net service actually set up
-let redirectTouched = false;
-
-function suggestRedirectIp(dns) {
-  const lan = dns ? dns.addresses.filter(a => !a.tailscale).map(a => a.address) : [];
-  if (!lan.length) return '';
-  const parts = lan[0].split('.');
-  parts[3] = '200';
-  return parts.join('.');
-}
-
-function renderRedirect(status) {
-  const saved = status.settings.redirect || {};
-  if (!redirectTouched) {
-    $('redirect-enabled').checked = saved.enabled === true;
-    $('redirect-ip').value = saved.ip || '';
-  }
-  // Suggest .200 in the Umbrel's own range
-  const suggestion = suggestRedirectIp(status.dns);
-  if (suggestion) $('redirect-ip').placeholder = `for example ${suggestion}`;
-
-  const net = status.net;
-  const error = $('redirect-error');
-  error.hidden = true;
-  if (!saved.enabled) {
-    setPill('redirect-pill', 'idle', 'Off');
-  } else if (!net) {
-    setPill('redirect-pill', 'warn', 'Waiting for the network helper');
-  } else if (net.error) {
-    setPill('redirect-pill', 'fail', 'Not set up');
-    error.textContent = net.error;
-    error.hidden = false;
-  } else if (net.active && net.ip === saved.ip) {
-    setPill('redirect-pill', 'ok', `On at ${net.ip}`);
-  } else {
-    setPill('redirect-pill', 'warn', 'Setting up…');
-  }
-}
-
-$('redirect-form').addEventListener('input', () => { redirectTouched = true; });
-
-$('redirect-form').addEventListener('submit', async event => {
-  event.preventDefault();
-  const saved = $('redirect-saved');
-  $('redirect-button').disabled = true;
-  try {
-    await api('redirect', {enabled: $('redirect-enabled').checked, ip: $('redirect-ip').value});
-    redirectTouched = false;
-    saved.className = 'note inline';
-    saved.textContent = 'Saved. It takes effect within a few seconds.';
-    setTimeout(refresh, 4000);
-  } catch (e) {
-    saved.className = 'note inline fail';
-    saved.textContent = e.message;
-  } finally {
-    $('redirect-button').disabled = false;
-  }
-});
-
 // The status panel at the bottom of the sidebar, and its short form in the phone header
 function renderChrome(state, title, detail) {
   const dot = el('span', undefined, `dot ${state}`);
@@ -241,7 +181,6 @@ async function refresh() {
     renderSync(status.hnsd);
     renderDns(status.dns, status.settings);
     renderDane(status.dane, status.dns);
-    renderRedirect(status);
     renderOverall(status);
     $('version').textContent = `Dit ${status.version}`;
     if (!modeTouched) {

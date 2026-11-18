@@ -26,10 +26,6 @@ const state = require('./lib/state');
 
 const DNSPROXY_BIN = process.env.DIT_DNSPROXY_BIN || 'dnsproxy';
 const UPSTREAM = process.env.DIT_UPSTREAM || '127.0.0.1:15350';
-// The dane service's DNS rewriter: the upstream while DANE without proxy
-// settings is on. UPSTREAM (hnsd) stays the fallback, so DNS keeps working
-// if the rewriter is down.
-const REWRITER = process.env.DIT_REWRITER || '127.0.0.1:15351';
 const MAIN_PORT = Number(process.env.DIT_MAIN_PORT || 53);
 const ALT_PORT = Number(process.env.DIT_ALT_PORT || 5300);
 const CACHE_BYTES = Number(process.env.DIT_CACHE_BYTES || 8 * 1024 * 1024);
@@ -42,10 +38,8 @@ let child = null;
 let stopping = false;
 let ipv6 = true;
 let wantedMode = null;
-let wantedModeKey = null;
 let current = {
   mode: 'auto',
-  upstream: UPSTREAM,
   // What "auto" decided, kept across restarts
   autoDecision: (state.loadDnsState() || {}).autoDecision || null,
   effective: null,
@@ -78,7 +72,7 @@ function writeState() {
       ...current,
       mainPort: MAIN_PORT,
       altPort: ALT_PORT,
-      fallback: UPSTREAM,
+      upstream: UPSTREAM,
       running: !!child,
       addresses: addresses(),
       updatedAt: new Date().toISOString(),
@@ -88,14 +82,13 @@ function writeState() {
   }
 }
 
-function runProxy(ports, upstream) {
+function runProxy(ports) {
   return new Promise(resolve => {
     const args = ['-l', '0.0.0.0'];
     if (ipv6) args.push('-l', '::');
     for (const port of ports) args.push('-p', String(port));
     // --refuse-any: no ANY answers, the classic amplification query
-    args.push('-u', upstream, '--cache', '--cache-size', String(CACHE_BYTES), '--refuse-any');
-    if (upstream !== UPSTREAM) args.push('--fallback', UPSTREAM);
+    args.push('-u', UPSTREAM, '--cache', '--cache-size', String(CACHE_BYTES), '--refuse-any');
     log(`starting: ${DNSPROXY_BIN} ${args.join(' ')}`);
 
     let output = '';
@@ -168,33 +161,28 @@ async function apply(force = false) {
   try {
     const settings = state.loadSettings();
     const mode = settings.mode;
-    const upstream = state.redirectEnabled(settings) ? REWRITER : UPSTREAM;
-    // savedAt changes on every save of the mode, so saving the same mode again retries port 53
-    const modeKey = `${mode}|${settings.savedAt || ''}`;
-    const wanted = `${modeKey}|${upstream}`;
+    // savedAt changes on every save, so saving the same mode again retries port 53
+    const wanted = `${mode}|${settings.savedAt || ''}`;
     // Unchanged settings: nothing to do. Crashes and failed starts are retried
     // by their own timers (force), not by this poll.
     if (!force && wanted === wantedMode) return;
-    // The mode saved from the web UI since this runner started (not a restart,
-    // and not a change of DANE without proxy settings): saving "auto" again
-    // means "decide again", so try port 53 first
-    if (wantedModeKey !== null && modeKey !== wantedModeKey && mode === 'auto') current.autoDecision = null;
+    // Settings saved from the web UI since this runner started (not a restart):
+    // saving "auto" again means "decide again", so try port 53 first
+    if (wantedMode !== null && wanted !== wantedMode && mode === 'auto') current.autoDecision = null;
     wantedMode = wanted;
-    wantedModeKey = modeKey;
     await stopProxy();
 
     let effective = mode === 'auto' ? (current.autoDecision || 'standalone') : mode;
-    current = {...current, mode, upstream, error: null, mainPortBusy: false, mainPortFree: false};
+    current = {...current, mode, error: null, mainPortBusy: false, mainPortFree: false};
 
     for (let attempt = 0; attempt < 4; attempt++) {
       const ports = effective === 'standalone' ? [MAIN_PORT, ALT_PORT] : [ALT_PORT];
-      const result = await runProxy(ports, upstream);
+      const result = await runProxy(ports);
       if (result.ok) {
         if (mode === 'auto' && !current.autoDecision) current.autoDecision = effective;
         current.effective = effective;
         current.ports = ports;
-        log(`listening on port${ports.length > 1 ? 's' : ''} ${ports.join(' and ')} (${effective} mode)`
-          + (upstream === UPSTREAM ? '' : `, through the DANE rewriter at ${upstream} (fallback ${UPSTREAM})`));
+        log(`listening on port${ports.length > 1 ? 's' : ''} ${ports.join(' and ')} (${effective} mode)`);
         return;
       }
 

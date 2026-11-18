@@ -291,7 +291,6 @@ type state struct {
 	CAFingerprint string    `json:"caFingerprint"`
 	CANotAfter    time.Time `json:"caNotAfter"`
 	DirectTLDs    int       `json:"directTlds"`
-	RedirectIP    string    `json:"redirectIp,omitempty"`
 	StartedAt     time.Time `json:"startedAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
@@ -306,12 +305,6 @@ func writeState(file string, s state) {
 
 func main() {
 	log.SetFlags(0)
-	// "dit-dane net": the network helper (netsetup.go), run by the "net" service
-	if len(os.Args) > 1 && os.Args[1] == "net" {
-		log.SetPrefix("[dit-net] ")
-		runNetHelper()
-		return
-	}
 	log.SetPrefix("[dit-dane] ")
 	cfg := loadSettings()
 	letsdane.Version = "0.6.1 (Dit)"
@@ -361,16 +354,6 @@ func main() {
 	}
 	log.Printf("listening on port %d, resolving through %s", cfg.port, cfg.resolver)
 
-	// v0.3: DANE without proxy settings. The rewriter and the fronts always
-	// run; they only change answers while it is switched on in settings.json.
-	redirect, err := loadRedirectSettings(cfg.dataDir, cfg.port)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := startRedirect(redirect, direct); err != nil {
-		log.Fatalf("redirect: %v", err)
-	}
-
 	stateFile := filepath.Join(cfg.dataDir, "dane-state.json")
 	current := state{
 		Running:       true,
@@ -381,17 +364,10 @@ func main() {
 		DirectTLDs:    len(direct),
 		StartedAt:     time.Now().UTC(),
 	}
-	report := func() {
-		current.RedirectIP = ""
-		if ip := redirect.target.IP(); ip != nil {
-			current.RedirectIP = ip.String()
-		}
-		writeState(stateFile, current)
-	}
-	report()
+	writeState(stateFile, current)
 	go func() {
-		for range time.Tick(5 * time.Second) {
-			report()
+		for range time.Tick(10 * time.Second) {
+			writeState(stateFile, current)
 		}
 	}()
 
