@@ -9,7 +9,7 @@ device, and no public resolver to trust.
 *Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
 brings to the whole network.
 
-> **Status: v0.4.0, early.** The image builds for amd64 and arm64 and the app
+> **Status: v0.4.1, early.** The image builds for amd64 and arm64 and the app
 > runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
 ## What it does

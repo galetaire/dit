@@ -4,7 +4,7 @@ name: Dit
 tagline: Resolve Handshake names on your whole home network
 icon: https://raw.githubusercontent.com/galetaire/dit/main/dit-resolver/dit.png
 category: networking
-version: "0.4.0"
+version: "0.4.1"
 port: 4748
 description: >-
   Dit is a DNS resolver for Handshake (HNS) names that runs on your own
@@ -36,10 +36,8 @@ repo: https://github.com/galetaire/dit
 support: https://github.com/galetaire/dit/issues
 gallery: []
 releaseNotes: >-
-  Removes the beta option "Without proxy settings": the auto-config proxy
-  works in every browser on phones and computers, so it is the one way to
-  set up DANE. Switch the option off before updating if you had it on; the
-  extra network address it used is removed then.
+  New logo and colours: Dit's page now uses the new fingerprint logo, with a
+  teal palette and a navy sidebar to match, in light and dark mode.
 dependencies: []
 path: ""
 defaultUsername: ""

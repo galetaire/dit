@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.4.0
+## State: v0.4.1
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -28,10 +28,14 @@ state-changing requests, multi-arch GitHub workflow, image tag = app version.
   two bind port 53.
 - UI (0.1.2): Castell's layout (dark sidebar with nav, status panel and
   theme toggle; pages #/, #/setup, #/mode, #/log as sections of index.html
-  shown by hash) with a violet accent instead of Castell's rust. Light/dark
+  shown by hash). Colours from the logo (19 Nov 2026): brand teal #31C4A1,
+  light-mode buttons/links in deeper teal #177D66 (white text 5:1; #31C4A1
+  with white text is only ~2.2:1), dark-mode accent #31C4A1 with dark text,
+  sidebar in the logo's navy (#1A2338 light, #0C1220 dark). Light/dark
   via data-theme on <html>, set by `public/theme.js` (CSP forbids inline
   scripts): saved choice (`dit-theme` in localStorage), else system setting.
-  Fingerprint icon, IBM Plex fonts. Local preview: `.claude/launch.json`
+  Logo: `dit-resolver/dit.png` (2383 px, store icon) is the source;
+  `docker/web/public/icon.png` is a 256 px copy of it. IBM Plex fonts. Local preview: `.claude/launch.json`
   ("dit-ui", hnsd disabled, data in gitignored `.dev-data/`).
 - App id `dit-resolver`, store id `dit`, UI port 4748, image
   `ghcr.io/galetaire/dit`.
@@ -125,7 +129,9 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
   request (18 Nov 2026): it only saved one Wi-Fi proxy setting on phones,
   computers needed the PAC anyway, and it cost a root service with
   NET_ADMIN, an extra LAN address, firewall rules and a DNS rewriter. The
-  auto-config proxy (v0.2) is the one way to get DANE.
+  auto-config proxy (v0.2) is the one way to get DANE. 0.4.0 checked on the
+  Umbrel (18 Nov 2026): .200 gone, real DNS answers, 9443/9080 closed, PAC
+  served, nathan.woodburn and hnsdoh load through the proxy.
 
 - SANE / stateless DANE (randomlogin/sane, htools-org/stateless-dane) was
   evaluated and rejected for this app: no fallback to plain DANE, so sites
@@ -135,6 +141,13 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
 - No DoT/DoH listeners in v0.1: Android Private DNS needs a publicly trusted
   certificate; remote use goes through Tailscale.
 - dnsproxy has no client allowlist: never forward port 53 from the router.
+
+## Spin-off: fingertip-android
+
+Away-from-home DANE on the phone moved to its own project,
+~/Documents/GitHub/fingertip-android (Android app: a VPN that only sets a
+system proxy, then letsdane via gomobile). Its CLAUDE.md has the full
+handoff; work on it there, not in this repo.
 
 ## Other ideas parked
 
