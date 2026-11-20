@@ -67,7 +67,8 @@ let checkRunning = false;
 
 function runChecker(name) {
   return new Promise((resolve, reject) => {
-    execFile(DANE_BIN, ['check', '-name', name, '-roots', hnsd.treeRoots.file],
+    // -resolver: the site's address comes from Dit's own hnsd, in this container
+    execFile(DANE_BIN, ['check', '-name', name, '-roots', hnsd.treeRoots.file, '-resolver', `127.0.0.1:${hnsd.RS_PORT}`],
       {timeout: 45000, maxBuffer: 256 * 1024},
       (err, stdout) => {
         // Exit code 1 only means "not verified": the report is still on stdout

@@ -9,7 +9,7 @@ device, and no public resolver to trust.
 *Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
 brings to the whole network.
 
-> **Status: v0.5.0, early.** The image builds for amd64 and arm64 and the app
+> **Status: v0.6.0, early.** The image builds for amd64 and arm64 and the app
 > runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
 ## What it does
@@ -108,11 +108,15 @@ newer image still sends them direct.
 
 Stateless DANE ([HIP-17](https://hsd-dev.org/HIPs/proposals/0017/)) lets a
 site carry the proof of its certificate itself: an Urkel proof from the
-Handshake name tree and the DNSSEC chain down to its TLSA record. No site
-sends those proofs in its certificate yet, so Dit offers a checker on the
-Secure sites page: type a name, and Dit fetches its proofs from a public
-proof service (sdaneproofs.htools.work, sdaneproofs.woodburn.au) and verifies
-them offline. The service is not trusted; every step is checked on the Umbrel:
+Handshake name tree and the DNSSEC chain down to its TLSA record, as two
+certificate extensions (`1.3.6.1.4.1.54392.5.1620` Urkel proof,
+`…5.1621` DNSSEC chain; the IDs htools and SANE use, which Castell embeds).
+Dit offers a checker on the Secure sites page: type a name, and Dit
+connects to the site (address from its own hnsd) and reads the proofs from
+the site's certificate (`docker/dane/sitecert.go`). When the certificate
+carries none, it fetches them from a public proof service
+(sdaneproofs.htools.work, sdaneproofs.woodburn.au). Neither source is
+trusted; every step is checked on the Umbrel:
 
 1. **Urkel proof** (`docker/dane/urkel.go`, a Go port of the reference
    [urkel](https://github.com/handshake-org/urkel) verifier): the proof must
@@ -127,12 +131,17 @@ them offline. The service is not trusted; every step is checked on the Umbrel:
 3. **DNSSEC chain** (`docker/dane/dnssecchain.go`, pure Go): the only trust
    anchor is the DS proven on chain; DNSKEY sets, delegations and finally the
    TLSA set must be signed and within their validity period.
-4. The proven TLSA records are compared with what Dit resolves right now.
+4. **Site's certificate:** the certificate the site actually serves must
+   match a proven TLSA record (DANE-EE usage 3, or DANE-TA usage 2 on its
+   chain). Without this step, someone could replay a site's real proofs on
+   their own server with their own key.
+5. The proven TLSA records are compared with what Dit resolves right now.
 
-`dit-dane check -name <name>` does steps 1-3 and prints JSON; the web server
-runs it (`POST /api/sane-check`) in its own container, so nothing new is
-exposed on the network. Checking certificates that carry the proofs inside
-the DANE proxy can follow once sites adopt HIP-17.
+`dit-dane check -name <name>` does steps 1-4 and prints JSON; the web server
+runs it (`POST /api/sane-check`, with `-resolver` pointing at its own
+hnsd) in its own container, so nothing new is exposed on the network.
+Verifying certificate proofs inside the DANE proxy itself, while browsing,
+is still to come.
 
 ## Install on umbrelOS
 
@@ -270,9 +279,18 @@ syncing to the tip): 64 tree roots collected (16 days); `nathan.woodburn` and
 `docker/dane/testdata` (anchored on 20 Nov 2026) and reject a wrong root, a
 DS that is not on chain, a changed TLSA record and expired signatures.
 
+Certificate proofs (v0.6): `belikebill`, served by Castell 0.4.0 with both
+extensions, verified from its own certificate in all steps (the proof
+services return HTTP 500 for it); `nathan.woodburn` verified through the
+service fallback with its served key matching. Go tests use belikebill's
+real certificate (`testdata/belikebill.crt`) and reject a server that
+replays those proofs with another key. Testing tip: Docker Desktop applies
+Windows' proxy settings to containers, so on a PC set up with Dit's PAC file
+a containerised checker sees Dit's re-signed certificates (correctly rejected
+at the key step); test from the Umbrel or a native build instead.
+
 Not tested yet:
 
-- The Stateless DANE checker on the Umbrel itself.
 - AdGuard Home in front of Dit; Tailscale (not used by the maintainer).
 - hnsd serving a whole network for days.
 

@@ -161,6 +161,7 @@ const SANE_STEPS = {
   ds: 'On-chain DNSSEC anchor',
   dnssec: 'DNSSEC chain',
   tlsa: 'TLSA record',
+  key: "Site's certificate",
   live: 'Compared with Dit',
 };
 

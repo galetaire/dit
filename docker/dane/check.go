@@ -2,20 +2,23 @@ package main
 
 // "dit-dane check -name <name>": the Stateless DANE checker (beta).
 //
-// Fetches a name's HIP-17 proofs (Urkel proof + DNSSEC chain) from a public
-// proof service and verifies them offline against the tree roots that Dit's
-// own hnsd synced. The service is not trusted: every step is checked here.
+// Takes a name's HIP-17 proofs (Urkel proof + DNSSEC chain) from the site's
+// own certificate (sitecert.go), or from a public proof service when the
+// certificate carries none, and verifies them offline against the tree roots
+// that Dit's own hnsd synced. Neither source is trusted: every step is
+// checked here.
 // Prints one JSON object with the steps, for the web server (server.js),
 // which runs this command in its own container (same image).
 //
 // Steps:
-//  1. proofs  fetched from a proof service
+//  1. proofs  read from the site's certificate, else fetched from a service
 //  2. urkel   the Urkel proof leads to the tree root it names, and proves the
 //             on-chain state of the top-level name
 //  3. root    that tree root is one Dit's hnsd synced, and recent enough
 //  4. ds      the proven state has DS records (the name's DNSSEC anchor)
 //  5. dnssec  the DNSSEC chain verifies from that DS, offline
 //  6. tlsa    the chain proves TLSA records for HTTPS on the name
+//  7. key     the certificate the site serves matches a proven TLSA record
 
 import (
 	"encoding/hex"
@@ -55,10 +58,13 @@ type rootInfo struct {
 }
 
 type checkReport struct {
-	Name    string      `json:"name"`
-	TLD     string      `json:"tld"`
-	OK      bool        `json:"ok"`
-	Service string      `json:"service,omitempty"`
+	Name    string `json:"name"`
+	TLD     string `json:"tld"`
+	OK      bool   `json:"ok"`
+	Service string `json:"service,omitempty"`
+	// Where the proofs came from: "certificate", "service" or "files"
+	Source  string      `json:"source,omitempty"`
+	Address string      `json:"address,omitempty"`
 	Steps   []checkStep `json:"steps"`
 	Root    *rootInfo   `json:"root,omitempty"`
 	DS      []hnsDS     `json:"ds,omitempty"`
@@ -123,6 +129,7 @@ func runCheck(args []string) int {
 	urkelFile := fs.String("urkel-file", "", "read the Urkel proof (hex) from this file instead of a service")
 	dnssecFile := fs.String("dnssec-file", "", "read the DNSSEC chain (hex) from this file instead of a service")
 	at := fs.String("at", "", "check as of this time (RFC 3339), for tests")
+	resolver := fs.String("resolver", "127.0.0.1:5350", "resolver for the site's address: Dit's hnsd")
 	var services multiFlag
 	fs.Var(&services, "service", "proof service base URL (repeatable)")
 	if err := fs.Parse(args); err != nil {
@@ -141,7 +148,7 @@ func runCheck(args []string) int {
 		now = t
 	}
 
-	report := check(strings.TrimSuffix(strings.ToLower(strings.TrimSpace(*name)), "."), *rootsFile, *urkelFile, *dnssecFile, services, now)
+	report := check(strings.TrimSuffix(strings.ToLower(strings.TrimSpace(*name)), "."), *rootsFile, *urkelFile, *dnssecFile, *resolver, services, now)
 	out, _ := json.MarshalIndent(report, "", "  ")
 	fmt.Println(string(out))
 	if !report.OK {
@@ -155,7 +162,7 @@ type multiFlag []string
 func (m *multiFlag) String() string     { return strings.Join(*m, ",") }
 func (m *multiFlag) Set(v string) error { *m = append(*m, v); return nil }
 
-func check(name, rootsFile, urkelFile, dnssecFile string, services []string, now time.Time) *checkReport {
+func check(name, rootsFile, urkelFile, dnssecFile, resolver string, services []string, now time.Time) *checkReport {
 	r := &checkReport{Name: name, Checked: now.UTC(), Steps: []checkStep{}}
 	step := func(id string, ok bool, format string, a ...any) bool {
 		r.Steps = append(r.Steps, checkStep{ID: id, OK: ok, Detail: fmt.Sprintf(format, a...)})
@@ -171,14 +178,26 @@ func check(name, rootsFile, urkelFile, dnssecFile string, services []string, now
 	// 1. Proofs
 	var urkelBlob, chainBlob []byte
 	var err error
+	var site *siteCert
+	var siteErr error
 	if urkelFile != "" || dnssecFile != "" {
+		r.Source = "files"
 		if urkelBlob, err = readHexFile(urkelFile); err == nil {
 			chainBlob, err = readHexFile(dnssecFile)
 		}
 		if !step("proofs", err == nil, "Read from files%s", errSuffix(err)) {
 			return r
 		}
+	} else if site, siteErr = fetchSiteCert(name, resolver); site.hasProofs() {
+		// The site carries its own proofs (HIP-17)
+		r.Source, r.Address = "certificate", site.Address
+		urkelBlob, chainBlob = site.Urkel, site.DNSSEC
+		step("proofs", true, "Read from the certificate %s serves (at %s): Urkel proof %d bytes, DNSSEC chain %d bytes. The certificate is not trusted by itself: everything below is checked here.", name, site.Address, len(urkelBlob), len(chainBlob))
 	} else {
+		r.Source = "service"
+		if site != nil {
+			r.Address = site.Address
+		}
 		var problems []string
 		for _, service := range services {
 			u, err1 := fetchProof(service, name, "urkel")
@@ -189,11 +208,15 @@ func check(name, rootsFile, urkelFile, dnssecFile string, services []string, now
 			}
 			problems = append(problems, fmt.Sprintf("%s: %v", hostOf(service), firstErr(err1, err2)))
 		}
+		why := "The site's certificate carries no proofs"
+		if siteErr != nil {
+			why = "Could not read the site's certificate (" + siteErr.Error() + ")"
+		}
 		if r.Service == "" {
-			step("proofs", false, "No proof service had proofs for %s (%s).", name, strings.Join(problems, "; "))
+			step("proofs", false, "%s, and no proof service had proofs for %s (%s).", why, name, strings.Join(problems, "; "))
 			return r
 		}
-		step("proofs", true, "Fetched from %s: Urkel proof %d bytes, DNSSEC chain %d bytes. The service is not trusted: everything below is checked here.", hostOf(r.Service), len(urkelBlob), len(chainBlob))
+		step("proofs", true, "%s, so they were fetched from %s: Urkel proof %d bytes, DNSSEC chain %d bytes. The service is not trusted: everything below is checked here.", why, hostOf(r.Service), len(urkelBlob), len(chainBlob))
 	}
 
 	// 2. Urkel proof
@@ -282,6 +305,18 @@ func check(name, rootsFile, urkelFile, dnssecFile string, services []string, now
 	if !step("tlsa", err == nil && len(res.TLSA) > 0, "%s", tlsaDetail(res, err, name)) {
 		return r
 	}
+
+	// 7. The certificate the site actually serves (not for proofs from files)
+	if r.Source != "files" {
+		if site == nil {
+			step("key", false, "Could not reach %s to compare its certificate with the proven TLSA record: %v", name, siteErr)
+			return r
+		}
+		ok, how := keyMatches(site.Chain, res.tlsa)
+		if !step("key", ok, "%s", keyDetail(ok, how, name, site.Address)) {
+			return r
+		}
+	}
 	r.OK = true
 	return r
 }
@@ -358,4 +393,11 @@ func tlsaDetail(res *chainResult, err error, name string) string {
 		return fmt.Sprintf("No proven TLSA record for %s: %v", name, err)
 	}
 	return fmt.Sprintf("Proven TLSA for https://%s/: %s", name, strings.Join(res.TLSA, "; "))
+}
+
+func keyDetail(ok bool, how, name, address string) string {
+	if ok {
+		return fmt.Sprintf("The certificate %s serves (at %s) matches the proven TLSA record: it pins %s.", name, address, how)
+	}
+	return fmt.Sprintf("The certificate %s serves (at %s) does NOT match the proven TLSA record (%s). This server is not the one the blockchain and DNSSEC vouch for.", name, address, how)
 }

@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.5.0
+## State: v0.6.0
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -163,9 +163,21 @@ page (#/dane). See README "Stateless DANE checker (beta)" for the design.
   for names without TLSA (humbly). SANE's reference sites (htools/,
   test.lazydane/) fail every TLS handshake.
 - Tested in Docker with the real image and a real hnsd (synced to 356629 in
-  ~70 s, 64 roots); not yet on the Umbrel.
-- Phase 2 (verify proofs carried in certificates inside the DANE proxy)
-  waits for real sites; HIP-17 extension OIDs are still "TBD".
+  ~70 s, 64 roots). On the Umbrel (21 Nov 2026, v0.5.0): 64 roots, newest
+  block 356617; nathan.woodburn and hnsdoh VERIFIED in all 8 steps (root
+  0e7787ce… from block 355465).
+- v0.6.0 (21 Nov 2026): the checker reads the proofs from the site's own
+  certificate first (`sitecert.go`: address via hnsd, `-resolver` from
+  server.js; OIDs 1.3.6.1.4.1.54392.5.1620/1621), falls back to the proof
+  services, and adds a "key" step: the served certificate must match a proven
+  TLSA (usage 3, or 2 on the chain), which stops proof replay on another
+  server. belikebill (Castell 0.4.0 with proofs turned on) VERIFIED from its
+  own certificate; services give HTTP 500 for it. Tested natively on Windows
+  (dit-dane.exe, resolver 192.168.1.27:53): Docker Desktop routes container
+  HTTPS through Windows' PAC = Dit's own proxy, so containers saw Dit-signed
+  certs (key step rejected them, correctly). Not yet run on the Umbrel.
+- Still open: verifying certificate proofs inside the DANE proxy while
+  browsing; HIP-17 extension OIDs are still "TBD" in the spec.
 
 ## Spin-off: fingertip-android
 

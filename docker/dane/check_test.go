@@ -22,7 +22,7 @@ func writeRoots(t *testing.T, roots []storedRoot) string {
 
 func runFileCheck(rootsFile string, at time.Time) *checkReport {
 	return check("nathan.woodburn", rootsFile,
-		"testdata/nathan.woodburn.urkel.hex", "testdata/nathan.woodburn.dnssec.hex", nil, at)
+		"testdata/nathan.woodburn.urkel.hex", "testdata/nathan.woodburn.dnssec.hex", "", nil, at)
 }
 
 func lastStep(r *checkReport) checkStep {
@@ -73,7 +73,7 @@ func TestCheckFailsWithoutRootsFile(t *testing.T) {
 }
 
 func TestCheckRejectsBadName(t *testing.T) {
-	r := check("../etc/passwd", "", "", "", nil, proofDay)
+	r := check("../etc/passwd", "", "", "", "", nil, proofDay)
 	if r.OK || len(r.Steps) != 1 {
 		t.Fatal("a bad name must stop the check")
 	}

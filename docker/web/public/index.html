@@ -252,7 +252,7 @@
             <h2>Stateless DANE <span class="badge small">Beta</span></h2>
             <span class="pill idle" id="sane-pill">Not checked</span>
           </div>
-          <p class="lead">Stateless DANE (HIP-17) lets a site carry the proof of its certificate itself: a proof from the Handshake blockchain and the DNSSEC signatures. Dit checks those proofs offline, against the blockchain data its own hnsd synced. No site sends its proofs yet, so this check fetches them from a public proof service, which is not trusted: every step is verified here.</p>
+          <p class="lead">Stateless DANE (HIP-17) lets a site carry the proof of its certificate itself: a proof from the Handshake blockchain and the DNSSEC signatures. Dit reads the proofs from the site's own certificate (as Castell sites can serve them), or from a public proof service when the certificate carries none, and checks them offline against the blockchain data its own hnsd synced. Neither source is trusted: every step is verified here, and the certificate the site serves must match the proven TLSA record.</p>
           <form id="sane-form" class="lookup">
             <label class="grow">
               <span class="field-label">Name</span>
