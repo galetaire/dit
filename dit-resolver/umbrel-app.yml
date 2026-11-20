@@ -4,7 +4,7 @@ name: Dit
 tagline: Resolve Handshake names on your whole home network
 icon: https://raw.githubusercontent.com/galetaire/dit/main/dit-resolver/dit.png
 category: networking
-version: "0.4.1"
+version: "0.5.0"
 port: 4748
 description: >-
   Dit is a DNS resolver for Handshake (HNS) names that runs on your own
@@ -36,8 +36,9 @@ repo: https://github.com/galetaire/dit
 support: https://github.com/galetaire/dit/issues
 gallery: []
 releaseNotes: >-
-  New logo and colours: Dit's page now uses the new fingerprint logo, with a
-  teal palette and a navy sidebar to match, in light and dark mode.
+  New beta on the Secure sites page: a Stateless DANE (HIP-17) checker. Type
+  a Handshake name and Dit verifies its blockchain and DNSSEC proofs offline,
+  against the tree roots its own hnsd synced. Browsing is unchanged.
 dependencies: []
 path: ""
 defaultUsername: ""

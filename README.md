@@ -9,7 +9,7 @@ device, and no public resolver to trust.
 *Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
 brings to the whole network.
 
-> **Status: v0.4.1, early.** The image builds for amd64 and arm64 and the app
+> **Status: v0.5.0, early.** The image builds for amd64 and arm64 and the app
 > runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
 ## What it does
@@ -103,6 +103,36 @@ Limits: Android has proxy settings per Wi-Fi network only, and most Android
 apps ignore user-installed CAs (Chrome trusts them). New ICANN TLDs added
 after the CA was created are not in its constraints, though the PAC file of a
 newer image still sends them direct.
+
+## Stateless DANE checker (beta)
+
+Stateless DANE ([HIP-17](https://hsd-dev.org/HIPs/proposals/0017/)) lets a
+site carry the proof of its certificate itself: an Urkel proof from the
+Handshake name tree and the DNSSEC chain down to its TLSA record. No site
+sends those proofs in its certificate yet, so Dit offers a checker on the
+Secure sites page: type a name, and Dit fetches its proofs from a public
+proof service (sdaneproofs.htools.work, sdaneproofs.woodburn.au) and verifies
+them offline. The service is not trusted; every step is checked on the Umbrel:
+
+1. **Urkel proof** (`docker/dane/urkel.go`, a Go port of the reference
+   [urkel](https://github.com/handshake-org/urkel) verifier): the proof must
+   lead to the tree root it names and prove the on-chain state of the
+   top-level name (key = SHA3-256 of the name, BLAKE2b-256 tree).
+2. **Tree root:** that root must be one Dit's own hnsd synced, at most 15
+   days old. `lib/treeroots.js` collects roots from hnsd's log
+   (`tree_root … timestamp …`, skipping headers hnsd rejects) into
+   `data/tree-roots.json`; hnsd re-adds about two weeks of headers on every
+   start, so the file always covers the window the proofs use (the services
+   anchor to the root from about 8 days ago, as HIP-17 asks).
+3. **DNSSEC chain** (`docker/dane/dnssecchain.go`, pure Go): the only trust
+   anchor is the DS proven on chain; DNSKEY sets, delegations and finally the
+   TLSA set must be signed and within their validity period.
+4. The proven TLSA records are compared with what Dit resolves right now.
+
+`dit-dane check -name <name>` does steps 1-3 and prints JSON; the web server
+runs it (`POST /api/sane-check`) in its own container, so nothing new is
+exposed on the network. Checking certificates that carry the proofs inside
+the DANE proxy can follow once sites adopt HIP-17.
 
 ## Install on umbrelOS
 
@@ -233,8 +263,16 @@ Chrome opens DANE sites with the CA and the auto-config proxy.
 Firefox on Android opens DANE sites through the proxy once "Use third party
 CA certificates" is on; Chrome, Brave and Firefox on Windows with the PAC.
 
+Stateless DANE checker (v0.5, Docker, the real image with a real hnsd
+syncing to the tip): 64 tree roots collected (16 days); `nathan.woodburn` and
+`hnsdoh` verified in all steps with live proofs and match Dit's own TLSA;
+`humbly` (no TLSA) stops at the first step. Go tests use real proofs saved in
+`docker/dane/testdata` (anchored on 20 Nov 2026) and reject a wrong root, a
+DS that is not on chain, a changed TLSA record and expired signatures.
+
 Not tested yet:
 
+- The Stateless DANE checker on the Umbrel itself.
 - AdGuard Home in front of Dit; Tailscale (not used by the maintainer).
 - hnsd serving a whole network for days.
 
@@ -242,6 +280,8 @@ Not tested yet:
 
 - [hnsd](https://github.com/handshake-org/hnsd) (MIT), Handshake light client.
 - [dnsproxy](https://github.com/AdguardTeam/dnsproxy) (Apache-2.0), AdGuard.
+- [urkel](https://github.com/handshake-org/urkel) (MIT, Christopher
+  Jeffrey): proof verification ported to Go in `docker/dane/urkel.go`.
 - IBM Plex fonts (SIL Open Font License), see `docker/web/public/fonts/OFL.txt`.
 
 Dit itself is released under the MIT License, see `LICENSE`.

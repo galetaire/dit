@@ -16,7 +16,7 @@ Conventions follow Castell: one image built from `docker/`, a dependency-free
 Node 22 server, `lib/source.js` request-source check, an `X-Dit` header on
 state-changing requests, multi-arch GitHub workflow, image tag = app version.
 
-## State: v0.4.1
+## State: v0.5.0
 
 - `server` service: Node web UI/API that starts and supervises hnsd
   (pinned commit 0cb70e5, checkpoint sync, saved headers). hnsd status comes
@@ -138,9 +138,34 @@ port 53 (auto fell back to upstream), standalone on 53 after removing it.
   without proof-carrying certificates fail; unmaintained since 2024; adds
   nothing when the proxy trusts a resolver on the same Umbrel. Possible later
   as a Castell feature (needs RSA keys, `delv`, weekly reissue, a full node).
+  Revisited 19-20 Nov 2026: the owner wanted it as a beta, built as an
+  opt-in checker only (v0.5.0), browsing unchanged.
 - No DoT/DoH listeners in v0.1: Android Private DNS needs a publicly trusted
   certificate; remote use goes through Tailscale.
 - dnsproxy has no client allowlist: never forward port 53 from the router.
+
+## Stateless DANE checker (beta), built 20 Nov 2026 (v0.5.0)
+
+Phase 1 of HIP-17 support: a "Stateless DANE (beta)" card on the Secure sites
+page (#/dane). See README "Stateless DANE checker (beta)" for the design.
+- Go (docker/dane): `urkel.go` (own MIT port of handshake-org/urkel's proof
+  verifier; nodech/go-hsd-utils was NOT used: it has no license), `hns.go`
+  (NameState name/resource, DS from hsd resource records), `dnssecchain.go`
+  (RFC 9102-style chain: skip 4 bytes, wire RRs; trust only the on-chain DS),
+  `check.go` (`dit-dane check -name`, JSON steps). Tests use real proofs in
+  testdata/ with a fixed date (proofDay, 20 Nov 2026).
+- Node: `lib/treeroots.js` collects roots from hnsd output (fed in
+  lib/hnsd.js), `data/tree-roots.json`, 16 days kept; server.js
+  `POST /api/sane-check` runs the Go checker (one at a time, 45 s) and adds
+  a "live" step comparing with hnsd's own TLSA answer.
+- Facts learned: proof services anchor to the root from ~8 days ago (HIP-17's
+  32nd most recent), so a 7-day window would fail; services answer HTTP 500
+  for names without TLSA (humbly). SANE's reference sites (htools/,
+  test.lazydane/) fail every TLS handshake.
+- Tested in Docker with the real image and a real hnsd (synced to 356629 in
+  ~70 s, 64 roots); not yet on the Umbrel.
+- Phase 2 (verify proofs carried in certificates inside the DANE proxy)
+  waits for real sites; HIP-17 extension OIDs are still "TBD".
 
 ## Spin-off: fingertip-android
 

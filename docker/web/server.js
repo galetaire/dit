@@ -3,6 +3,7 @@
 // Dit: a Handshake resolver for your home network, on Umbrel.
 // This server is the app's web UI and API. It also runs hnsd (lib/hnsd.js).
 // The DNS front end your devices talk to is the separate "dns" service (dns-runner.js).
+const {execFile} = require('child_process');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
@@ -53,7 +54,70 @@ async function getStatus() {
     dns: fresh ? dns : null,
     // null: the DANE proxy has not reported (yet), or stopped reporting
     dane: daneFresh ? dane : null,
+    // Tree roots collected from hnsd, for the Stateless DANE checker
+    treeRoots: hnsd.treeRoots.summary(),
   };
+}
+
+// ---------- Stateless DANE checker (beta) ----------
+
+// The Go checker, in this same image (docker/dane/check.go)
+const DANE_BIN = process.env.DIT_DANE_BIN || '/usr/local/bin/dit-dane';
+let checkRunning = false;
+
+function runChecker(name) {
+  return new Promise((resolve, reject) => {
+    execFile(DANE_BIN, ['check', '-name', name, '-roots', hnsd.treeRoots.file],
+      {timeout: 45000, maxBuffer: 256 * 1024},
+      (err, stdout) => {
+        // Exit code 1 only means "not verified": the report is still on stdout
+        try {
+          resolve(JSON.parse(stdout));
+        } catch (e) {
+          reject(new UserError(err && err.killed ? 'The check took too long.' : 'The checker did not answer.'));
+        }
+      });
+  });
+}
+
+const tlsaKey = text => String(text).trim().toLowerCase().replace(/\s+/g, ' ');
+
+// Checks a name's HIP-17 proofs, then compares the proven TLSA records with
+// what Dit's own resolver (hnsd) answers right now
+async function saneCheck(body) {
+  const name = normalizeName(body.name);
+  if (name.startsWith('_')) throw new UserError('Enter the site name, like nathan.woodburn.');
+  if (checkRunning) throw new UserError('A check is already running. Try again in a moment.');
+  checkRunning = true;
+  try {
+    hnsd.treeRoots.flush();
+    const report = await runChecker(name);
+    let live = null;
+    try {
+      const result = await hnsd.lookup(`_443._tcp.${name}`, 'TLSA');
+      live = (result.answers || []).filter(a => a.type === 'TLSA').map(a => a.data);
+    } catch (e) {
+      live = null;
+    }
+    const proven = (report.tlsa || []).map(tlsaKey).sort();
+    const current = (live || []).map(tlsaKey).sort();
+    if (report.ok) {
+      const same = live !== null && proven.length === current.length && proven.every((t, i) => t === current[i]);
+      report.steps.push({
+        id: 'live',
+        ok: same,
+        detail: same
+          ? 'Matches the TLSA record Dit resolves right now through hnsd.'
+          : live === null
+            ? 'Dit could not look up the TLSA record right now to compare.'
+            : `Differs from what Dit resolves right now (${current.join('; ') || 'nothing'}). The site may have changed its key since the proof was made.`,
+      });
+      report.ok = same;
+    }
+    return report;
+  } finally {
+    checkRunning = false;
+  }
 }
 
 async function lookup(body) {
@@ -155,6 +219,7 @@ async function handle(req, res) {
       if (req.headers['x-dit'] !== '1') return sendJson(res, 403, {error: 'Missing X-Dit header.'});
       const body = await readJson(req);
       if (pathname === '/api/lookup') return sendJson(res, 200, await lookup(body));
+      if (pathname === '/api/sane-check') return sendJson(res, 200, await saneCheck(body));
       if (pathname === '/api/settings') return sendJson(res, 200, saveSettings(body));
     }
     return sendJson(res, 404, {error: 'Not found.'});

@@ -151,6 +151,61 @@ function renderDane(dane, dns) {
   $('dane-fingerprint').textContent = dane.caFingerprint;
 }
 
+// ---------- Stateless DANE checker (beta) ----------
+
+const SANE_STEPS = {
+  proofs: 'Proofs',
+  'urkel-decode': 'Urkel data',
+  urkel: 'Blockchain proof',
+  root: 'Tree root',
+  ds: 'On-chain DNSSEC anchor',
+  dnssec: 'DNSSEC chain',
+  tlsa: 'TLSA record',
+  live: 'Compared with Dit',
+};
+
+function renderTreeRoots(summary) {
+  const line = $('sane-roots');
+  if (!summary || !summary.count) {
+    line.textContent = 'Dit has not collected tree roots from hnsd yet. They come in with new blocks and every time hnsd starts.';
+    return;
+  }
+  const newest = summary.newestTime ? ago(summary.newestTime) : 'unknown';
+  line.textContent = `Dit knows ${summary.count} tree roots from its own hnsd (newest from block ${summary.newestHeight.toLocaleString('en')}, ${newest}).`;
+}
+
+function renderSane(report) {
+  const box = $('sane-result');
+  const list = el('ul', undefined, 'check-list');
+  for (const step of report.steps) {
+    const li = el('li');
+    li.append(el('span', step.ok ? '✓' : '✕', `check-icon ${step.ok ? 'ok' : 'fail'}`));
+    const text = el('span');
+    text.append(el('strong', SANE_STEPS[step.id] || step.id), el('span', step.detail, 'detail'));
+    li.append(text);
+    list.append(li);
+  }
+  box.replaceChildren(list);
+  setPill('sane-pill', report.ok ? 'ok' : 'fail', report.ok ? 'Verified' : 'Not verified');
+}
+
+$('sane-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = $('sane-button');
+  button.disabled = true;
+  button.textContent = 'Checking…';
+  setPill('sane-pill', 'idle', 'Checking…');
+  try {
+    renderSane(await api('sane-check', {name: $('sane-name').value}));
+  } catch (e) {
+    $('sane-result').replaceChildren(el('p', e.message, 'note inline fail'));
+    setPill('sane-pill', 'fail', 'Error');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Check';
+  }
+});
+
 // The status panel at the bottom of the sidebar, and its short form in the phone header
 function renderChrome(state, title, detail) {
   const dot = el('span', undefined, `dot ${state}`);
@@ -181,6 +236,7 @@ async function refresh() {
     renderSync(status.hnsd);
     renderDns(status.dns, status.settings);
     renderDane(status.dane, status.dns);
+    renderTreeRoots(status.treeRoots);
     renderOverall(status);
     $('version').textContent = `Dit ${status.version}`;
     if (!modeTouched) {

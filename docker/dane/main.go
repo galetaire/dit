@@ -305,6 +305,11 @@ func writeState(file string, s state) {
 
 func main() {
 	log.SetFlags(0)
+	// "dit-dane check -name <name>": the Stateless DANE checker (check.go),
+	// run by the web server; prints JSON and exits
+	if len(os.Args) > 1 && os.Args[1] == "check" {
+		os.Exit(runCheck(os.Args[2:]))
+	}
 	log.SetPrefix("[dit-dane] ")
 	cfg := loadSettings()
 	letsdane.Version = "0.6.1 (Dit)"

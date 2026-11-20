@@ -12,6 +12,10 @@ const {spawn} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const dnsclient = require('./dnsclient');
+const {createCollector} = require('./treeroots');
+
+// Tree roots from hnsd's own block headers, for the Stateless DANE checker
+const treeRoots = createCollector();
 
 const HNSD_BIN = process.env.DIT_HNSD_BIN || 'hnsd';
 const DATA_DIR = path.join(process.env.DIT_DATA || '/data', 'hnsd');
@@ -95,8 +99,13 @@ function start() {
   startedAt = Date.now();
   child = spawn(HNSD_BIN, args, {stdio: ['ignore', 'pipe', 'pipe']});
   // One filter per stream, so a line cut between chunks is joined correctly
-  const out = createLogFilter(addLine);
-  const err = createLogFilter(addLine);
+  // Every whole line also goes to the tree-root collector (Stateless DANE checker)
+  const toLog = line => {
+    treeRoots.feed(line);
+    addLine(line);
+  };
+  const out = createLogFilter(toLog);
+  const err = createLogFilter(toLog);
   child.stdout.on('data', chunk => out.write(chunk));
   child.stderr.on('data', chunk => err.write(chunk));
   child.on('error', e => {
@@ -119,6 +128,7 @@ function start() {
 
 function stop() {
   stopping = true;
+  treeRoots.flush();
   if (!child) return Promise.resolve();
   return new Promise(resolve => {
     const timer = setTimeout(() => { if (child) child.kill('SIGKILL'); }, 20000);
@@ -169,4 +179,4 @@ function lookup(name, type) {
   return dnsclient.query({host: '127.0.0.1', port: RS_PORT, name, type});
 }
 
-module.exports = {start, stop, status, lookup, log: () => logLines.slice(), createLogFilter, RS_PORT, NS_PORT};
+module.exports = {start, stop, status, lookup, log: () => logLines.slice(), createLogFilter, treeRoots, RS_PORT, NS_PORT};
