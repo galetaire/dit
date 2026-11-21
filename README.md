@@ -1,4 +1,4 @@
-# Dit
+# Dit 🫆
 
 A Handshake (HNS) resolver for your home network, as an umbrelOS community app.
 
