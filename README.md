@@ -142,11 +142,9 @@ is still to come.
 
 ## Install on umbrelOS
 
-1. Push this repository to GitHub and let the workflow build
-   `ghcr.io/galetaire/dit:<version>` (make the package public).
-2. In umbrelOS: App Store → ⋯ → Community App Stores → add
+1. In umbrelOS: App Store → ⋯ → Community App Stores → add
    `https://github.com/galetaire/dit`.
-3. Install Dit and open it.
+2. Install Dit and open it.
 
 ## Security notes
 
@@ -220,13 +218,6 @@ Environment variables:
 | `DIT_MAIN_PORT`, `DIT_ALT_PORT` | `53`, `5300` | dns |
 | `DIT_CACHE_BYTES` | 8 MB | dns |
 
-### Releasing
-
-1. Bump `version` in `dit-resolver/umbrel-app.yml`, the image tag (twice)
-   in `dit-resolver/docker-compose.yml`, and `docker/web/package.json`.
-2. Push to `main`: the workflow builds amd64 and arm64 images tagged with that
-   version.
-
 ## Tested and not tested
 
 Tested locally (Node 22, hnsd built from the pinned commit, dnsproxy v0.86.0):
@@ -288,7 +279,7 @@ at the key step); test from the Umbrel or a native build instead.
 
 Not tested yet:
 
-- AdGuard Home in front of Dit; Tailscale (not used by the maintainer).
+- AdGuard Home in front of Dit; Tailscale.
 - hnsd serving a whole network for days.
 
 ## Credits and licenses
