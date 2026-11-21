@@ -6,9 +6,6 @@ Point your router, your phone or a single device at your Umbrel and Handshake
 names resolve next to all the regular internet names. Nothing to install on each
 device, and no public resolver to trust.
 
-*Dit* is Catalan for finger, after Fingertip, the desktop resolver this app
-brings to the whole network.
-
 > **Status: v0.6.0, early.** The image builds for amd64 and arm64 and the app
 > runs on an Umbrel (Raspberry Pi). See [Tested and not tested](#tested-and-not-tested).
 
